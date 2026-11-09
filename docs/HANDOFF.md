@@ -2,9 +2,18 @@
 
 ## State
 
-- Repository scaffolded locally and (once the owner created it) pushed: docs, lint and test
-  configuration, the simulated client, the feedback-loop scripts, CI. No addon yet beyond the
-  MarketScan lane in flight.
+- Repository scaffolded locally, not yet on GitHub: docs, lint and test configuration, CI, the
+  feedback-loop scripts. **MarketScan is built on branch `lane/marketscan`** (worktree
+  `/home/user/wt-marketscan` in the cloud session; three commits): one-button `ReplicateItems`
+  scan, per-item min/median/quantity/count packed into SavedVariables, 33 specs, a home-grown
+  simulated client in `spec/support/wow.lua`. Reviewed by the coordinator and one independent
+  review; its one real finding (a pending request outliving a closed auction-house window, so
+  another addon's scan could have been stored without a click) is fixed and spec'd. busted
+  could not run in the cloud container (its `term` dependency is a GitHub archive the session's
+  GitHub gate refuses); the specs were run through a plain-Lua shim and CI runs busted proper.
+- The GitHub repository `Atomtomate/wow-forever-addons` did not exist when the session ended:
+  the owner creates it (private, empty), then the session attaches it, pushes `main` and the
+  lane, and opens the draft PR.
 - Research: `docs/RESEARCH.md`. Its decisive findings were verified against GitHub sources
   (FriendlyForever's TOC and luacheck config, Blizzard's Forever UI source, Auctioneer-Forever's
   README) on 2026-11-09. The wiki and guide sites were blocked from the cloud session when the
