@@ -34,3 +34,9 @@ files["spec/**"] = {
     globals = { "_G" },
     ignore = { "122" }, -- tests set read-only globals on purpose to simulate the client
 }
+
+files["addons/*/spec/**"] = {
+    std = "+busted",
+    globals = { "_G", "SLASH_MARKETSCAN1", "SLASH_MARKETSCAN2", "MarketScanDB", "AuctionHouseFrame" },
+    ignore = { "122" },
+}
