@@ -51,4 +51,9 @@ Tests cover the logic and a simulated client; these need the real one.
 6. Does the button show and sit sensibly on `AuctionHouseFrame`? If the frame has another name,
    the log says "AuctionHouseFrame missing".
 7. Does the file load back at login: `/dump MarketScanDB and #MarketScanDB.scans` after a relog.
-8. Does a 100k-row scan hitch? (500 rows per frame is a guess.)
+8. Does `REPLICATE_ITEM_LIST_UPDATE` fire once or several times per scan? Only the first is used.
+9. Does `AuctionHouseFrame` exist when `AUCTION_HOUSE_SHOW` reaches the addon (does the button appear),
+   and is its TOPRIGHT placement acceptable?
+10. `/run print(format("%d", 1e11))`: is `%d` 64-bit in this client? (The addon avoids it.)
+11. The written file is `MarketScan.lua` and holds `MarketScanDB`.
+12. Does a 100k-row scan hitch? (500 rows per frame is a guess.)

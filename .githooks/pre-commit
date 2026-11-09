@@ -5,5 +5,5 @@ root=$(git rev-parse --show-toplevel) || exit 0
 cd "$root" || exit 0
 command -v luacheck >/dev/null || { echo "pre-commit: luacheck not installed, lint skipped"; exit 0; }
 luacheck addons spec --no-cache -q || exit 1
-command -v busted >/dev/null || { echo "pre-commit: busted not installed, tests skipped"; exit 0; }
+busted --version >/dev/null 2>&1 || { echo "pre-commit: busted not working, tests skipped"; exit 0; }
 busted --output=plainTerminal

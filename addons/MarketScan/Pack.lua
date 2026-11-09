@@ -85,11 +85,12 @@ function ns.aggregate(rows)
     return agg, skipped
 end
 
+-- "%.0f" not "%d": Lua 5.1 %d casts to C long, possibly 32 bits in the Windows client.
 -- "min:med:qty:n" per item: compact, plain strings the SavedVariables parser reads untouched.
 function ns.pack(agg)
     local packed = {}
     for itemID, entry in pairs(agg) do
-        packed[itemID] = string.format("%d:%d:%d:%d", entry.min, entry.med, entry.qty, entry.n)
+        packed[itemID] = string.format("%.0f:%.0f:%.0f:%.0f", entry.min, entry.med, entry.qty, entry.n)
     end
     return packed
 end

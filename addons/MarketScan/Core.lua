@@ -103,7 +103,9 @@ local function onReplicateUpdate()
     if not requested or current then
         return -- not our scan, or one already being read
     end
-    local ok, total = pcall(C_AuctionHouse.GetNumReplicateItems)
+    local ok, total = pcall(function()
+        return C_AuctionHouse.GetNumReplicateItems() + 0 -- a secret value fails here, inside the pcall
+    end)
     if not ok or type(total) ~= "number" then
         requested = false
         ns.log("scan failed: GetNumReplicateItems unusable")
@@ -132,7 +134,12 @@ local function requestScan()
     end
     requested = true
     ns.log("scan requested")
-    C_AuctionHouse.ReplicateItems()
+    local ok, err = pcall(C_AuctionHouse.ReplicateItems)
+    if not ok then
+        requested = false
+        ns.log("ReplicateItems failed: " .. tostring(err))
+        say("Auction house is busy, try again in a moment.")
+    end
 end
 
 local button
@@ -162,8 +169,9 @@ end
 
 local function onAuctionHouseClosed()
     ahOpen = false
+    requested = false -- a pending request must not outlive the window it was made in (D5)
     if current then
-        current, requested = nil, false
+        current = nil
         ns.log("scan aborted: auction house closed")
     end
 end
