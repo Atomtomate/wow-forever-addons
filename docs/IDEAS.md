@@ -3,7 +3,7 @@
 The durable backlog; entries are updated, never deleted. Status words: **next**, **later**,
 **parked** (needs something external), **dropped** (with the reason).
 
-- **MarketScan** — next. One-button full scan of the auction house, per-item minimum buyout,
+- **MarketScan** — in progress (lane/marketscan). One-button full scan of the auction house, per-item minimum buyout,
   median, quantity and auction count, stored compactly in SavedVariables with a timestamp.
 - **Price history and tooltips** — later. Needs the client to load SavedVariables back
   (`docs/RESEARCH.md` §1.3); until then every session starts empty.

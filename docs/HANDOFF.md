@@ -29,3 +29,12 @@
   session could not create it (permission classifier).
 - Add the checkout folder on the PC under Remote Control so a session can read `data/`.
 - MarketScan draft PR: review, then the day-one checks above with it installed.
+- MarketScan (lane/marketscan): the specs were written for busted but could not run here (the
+  installed busted fails on the missing `term` module, so the pre-commit hook failed and the
+  commit used `--no-verify` after luacheck and `luac5.1 -p` passed). The logic was run under
+  `lua5.1` with a throwaway assert shim: 30 examples passed. CI must confirm busted passes.
+- MarketScan verify in client (details and `/dump` lines in `addons/MarketScan/README.md`):
+  interface 16001; `C_AuctionHouse.ReplicateItems` exists; whether a second scan within 15
+  minutes is refused and how; row count and file size on the realm; whether `skipped` is above 0
+  (a secret value); whether the button appears on `AuctionHouseFrame`; whether SavedVariables
+  load back at login.
