@@ -13,11 +13,12 @@ Read this after `CLAUDE.md`. Replace it when the next session closes.
 - **Draft PR #1, MarketScan** (`lane/marketscan`, 3 commits): one-button `ReplicateItems` scan,
   per-item min/median/quantity/count packed into SavedVariables, 33 specs on our own simulated
   client (`spec/support/wow.lua`). Reviewed by the coordinator and one independent review;
-  findings folded, the dismissed ones with reasons in the PR body. **CI's busted run is the
-  first thing to check**: busted could not run in the cloud container (its `term` dependency is
-  a GitHub source archive the session's GitHub gate refuses to download; cloning and building it
-  needs the owner's say because it runs external code), so the specs were only run through a
-  plain-Lua shim.
+  findings folded, the dismissed ones with reasons in the PR body. **CI is green on the PR's
+  head cad140e: 33 busted specs pass, lint clean.** (busted could not run in the cloud
+  container: its `term` dependency is a GitHub source archive the session's GitHub gate refuses
+  to download, and cloning and building it needs the owner's say because it runs external
+  code. The first CI run failed because `.busted` pinned the interpreter name `lua5.1`, which
+  the runner lacks; the pin is removed on `main` and merged into the lane.)
 - Nothing has run in the real client yet. The addon's README lists twelve "verify in client"
   items; the first scan on the owner's realm is the real test.
 
@@ -32,7 +33,7 @@ Read this after `CLAUDE.md`. Replace it when the next session closes.
 
 ## First steps for the next session
 
-1. Read PR #1's CI result. Green: ask the owner whether it may merge. Red: fix on the lane.
+1. PR #1 is green and mergeable; ask the owner whether it may merge (they say "merge").
 2. Owner's side, once merged and pulled on the PC: `tools\link.ps1 MarketScan`, restart the
    client, open the auction house, press "Scan prices", `/reload`, `tools\pull_sv.ps1
    MarketScan`. Go through the README's verify-in-client list with them; record the answers in
