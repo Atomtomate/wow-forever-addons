@@ -11,20 +11,22 @@ addon's SavedVariables file with signed requests, tells the site once a minute w
 running, writes the site's member list where the addon can load it, and notices when the site cannot
 be reached (it reports that stretch with the next request that gets through).
 
-It never reads the game's memory, never touches any file under `WTF` except
-`SavedVariables/ForeverFriends.lua` (read only), never sends what `docs/CONTRACT.md` §5 does not list,
-never runs anything it downloaded and never updates itself: a new version is a new download. It writes
-only inside `Interface/AddOns/ForeverFriends` and `Interface/AddOns/ForeverFriendsData` in the game
-folder, plus its own config folder, its program copy and its autostart entry.
+What it never does is `docs/DECISIONS.md` D7, and what crosses the wire and what does not is
+`docs/CONTRACT.md` §5. In short: of the game's files it reads one, the addon's SavedVariables file, and
+it writes only inside the two addon folders; it looks at which programs run, to see whether the game is
+one of them, and at nothing inside them; it never updates itself, a new version is a new download.
 
 ## Setup, as a member sees it
 
-Download `ForeverFriendsCompanion-windows-amd64.exe` from the site's Game link page and double-click it.
-Windows SmartScreen warns once because the program is unsigned: "More info", then "Run anyway".
+Download `ForeverFriendsCompanion-windows-amd64.exe` from the site's `/companion` page, which also shows
+the site's address, and double-click it. Windows SmartScreen warns once because the program is unsigned:
+"More info", then "Run anyway".
 
 ```
 Forever Friends companion 0.1.0. It links this PC to your group's site, installs the addon and tells
-the site when the game runs. It reads only the addon's own file. Nothing changes until you answer.
+the site when the game runs. Of the game's files it reads only the addon's own; it looks at which
+programs are running only to see whether the game is one of them.
+Nothing changes until you answer.
 Game folder: found C:\Program Files (x86)\World of Warcraft\_forever_ . Use it? [Y/n]
 Site address (shown on the site's /companion page) []: https://forever.example
 Name of this PC on the site [JULIAN-PC]:
@@ -36,13 +38,19 @@ Addon ForeverFriends 0.1.0: installed.
 Restart the game once so that it loads the addon (a running game does not see a new folder).
 Companion copied to C:\Users\Anna\AppData\Local\Programs\ForeverFriends.
 It starts with Windows and is running now.
-Press Enter to close, or type "remove" to unlink this PC and take everything away:
+Press Enter to close, or type "remove" to unlink this PC and remove the companion:
 ```
 
 Closing the window before pressing Link is fine: running it again shows the same code until it expires,
-then asks before starting a new one. Running a newer download later updates the addon and the program
-copy (it stops the running one first, up to 45 seconds). It never replaces a newer addon or program with
-an older one without asking, and it leaves an addon folder that is a link (a developer's checkout) alone.
+then asks before starting a new one; a declined or expired code is not shown again. "Nothing changes
+until you answer" is said on a first run only. A later run of a newer download says what it will do
+instead: it updates the addon and the program copy, stops the running copy first (up to 45 seconds) and
+starts the new one.
+
+**The installed version is the `## Version` of the installed `ForeverFriends.toc`**, which the addon and
+the program share. A download older than that replaces neither the addon nor the program copy, says so in
+one line, and goes on with everything else. An addon folder that is a link (a developer's checkout) is
+left alone, and a folder that is not ours is replaced only on a "yes" that `--yes` never gives.
 
 ## Commands
 
@@ -80,60 +88,64 @@ The config folder is local, not roaming: a roaming profile would copy the key to
 
 ## Other systems
 
-The same program builds for macOS and Linux and can be started by hand (`companion setup`, then
-`companion run` in a terminal and leave it open). Linking, uploading characters and writing the member
-list work there. What does not: there is no autostart on either; on macOS the program cannot list
-processes, so it never reports the game as running; on Linux it reads `/proc/<pid>/exe`, which is
-unverified for a game started under Wine or Proton (the executable there is the loader, not a file in
-the game folder). Only Windows is tested by a person. No macOS file is published; CI only checks that
-the macOS build compiles.
+The group has Mac and Linux players (`docs/DECISIONS.md` D7). In version one the same program builds for
+both and is started by hand: `companion setup`, then `companion run` in a terminal that stays open.
+Linking, uploading characters and writing the member list work there; the program is **never shown as
+in game** from a Mac, and from Linux only if the game is found, which is unverified under Wine and
+Proton (it reads `/proc/<pid>/exe`, which there names the loader, not a file in the game folder). There
+is no autostart on either. Finding the game on those systems, and autostart, are the next pull request.
+`release.yml` publishes files for macOS (arm64 and amd64) and Linux; nobody has run the macOS ones, and
+macOS will ask before it lets an unsigned program run.
 
 ## Releasing
 
 The tag must be `v` plus the `## Version` line of `addons/ForeverFriends/ForeverFriends.toc`, and
-`.github/workflows/release.yml` refuses any other. The addon and the companion share that one number, so
-a companion-only fix still means raising that line. The workflow tests, builds the Windows and Linux
-files with `-trimpath` (the Windows one for the windowed subsystem, so autostart shows no console),
-writes `SHA256SUMS` and publishes them with `gh release create`. Run it by hand
-(`workflow_dispatch`) to get the files as a run artifact without publishing.
+`.github/workflows/release.yml` refuses any other. The addon and the companion share that one number, so a
+companion-only fix still means raising that line. The workflow runs the tests, builds the files with
+`-trimpath` (the Windows one for the windowed subsystem, so autostart shows no console), writes
+`SHA256SUMS` and publishes with `gh release create`; run by hand (`workflow_dispatch`) it only keeps the
+files as a run artifact.
 
 ## Verify on the PC
 
 Nothing below can be proved by the tests in this repository (they run on Linux and, in CI, on a Windows
-runner without a game). Each is a check on the owner's PC; none is claimed to work until done.
+runner without a game); nothing has been run on a PC yet. Each is a check on the owner's PC.
 
-1. **Double-click setup**: a console appears with the text above. From a terminal, the same text appears
-   in that terminal. `ForeverFriendsCompanion.exe version` prints nothing in a terminal (by design: it is
-   read through a pipe); `status` shows the version.
+1. **Double-click setup**: a console appears with the text above; from a terminal the same text appears in
+   that terminal. `ForeverFriendsCompanion.exe version` prints the version in a terminal.
 2. **Browser and login**: the browser opens on the code page and, when not logged in, returns to the same
-   code after the login. `Ctrl+C`, run again: same code, no new start on the site.
-3. **Game folder**: the guess is right, or the typed folder is accepted. The registry hint is a guess:
-   `reg query "HKLM\SOFTWARE\WOW6432Node\Blizzard Entertainment\World of Warcraft"`.
+   code after the login. `Ctrl+C`, run again: same code, no new start on the site. Press Decline on the
+   site: the next run starts a new code.
+3. **Game folder**: the Program Files guess is right, or the typed folder is accepted.
 4. **The game's executable lies inside the folder**:
    `Get-Process | Where-Object { $_.Path -like "*\_forever_\*" } | Select-Object Path`; then `status`
    says "Game running now: true" within 15 seconds of starting the game and "false" after it exits, also
    when the game was started as administrator.
-5. **No window at logon**: after a reboot, no console flashes; the background copy is running
+5. **No window at logon**: after a reboot no console flashes; the background copy is running
    (`Get-Process ForeverFriendsCompanion`, exactly one) and
    `reg query HKCU\Software\Microsoft\Windows\CurrentVersion\Run /v ForeverFriendsCompanion` names the
    program copy.
 6. **Replacing the installed copy while it runs**: run a second download; `Get-Process ForeverFriendsCompanion`
    still shows one, started after setup; `stop.request` is gone.
-7. **Key file**: `icacls "%LOCALAPPDATA%\ForeverFriends\device.key"` lists only this user, SYSTEM and
+7. **An older download**: run it over a newer install; it says the addon and the program copy were left
+   alone, and `Get-Item` on both shows unchanged write times.
+8. **Key file**: `icacls "%LOCALAPPDATA%\ForeverFriends\device.key"` lists only this user, SYSTEM and
    Administrators.
-8. **A junction is left alone**: after `tools\link.ps1 ForeverFriends`,
+9. **A junction is left alone**: after `tools\link.ps1 ForeverFriends`,
    `Get-Item "<AddOns>\ForeverFriends" | Select-Object LinkType` says `Junction`; run setup; the output says
    "left alone" and the checkout is unchanged (`git status` there).
-9. **`Data.lua` replaced while the game runs**: change the member list on the site; after `/reload` the
-   addon shows it (`/ff members`). A first install needs one game restart.
-10. **Sleep**: put the PC to sleep and wake it with the network down; the log shows no outage report later.
-11. **SmartScreen and Defender** on the first download and the first run of an unsigned program that copies
+10. **`Data.lua` replaced while the game runs**: change the member list on the site; after `/reload` the
+    addon shows it (`/ff members`). A first install needs one game restart.
+11. **Sleep**: put the PC to sleep and wake it with the network down; the log shows no outage report later.
+12. **SmartScreen and Defender** on the first download and the first run of an unsigned program that copies
     itself and adds a Run key; if Defender flags it, submit the file to Microsoft as a false positive.
-12. **Remove**: `ForeverFriendsCompanion.exe remove`: the PC disappears from the profile on the site, the
-    Run value, both addon folders and the config folder are gone, and the program copy's folder is named
-    when it cannot delete itself.
-13. **The hub behind Caddy**: `PUBLIC_URL` is `https://`, `TRUST_PROXY=1`, and Caddy passes the `X-FF-*`
+13. **Remove**: `ForeverFriendsCompanion.exe remove`: the PC disappears from the profile on the site, the Run
+    value, both addon folders and the config folder are gone, and the program copy's folder is named when
+    it cannot delete itself. The characters stay on the site (delete them on your profile) and so does the
+    game's own `ForeverFriends.lua`; the last lines of the output say so.
+14. **The real `ForeverFriends.lua`**: the parser reads CRLF and LF and only the forms the client writes;
+    after the game has written the file, `ForeverFriendsCompanion.exe status` shows "Characters in the
+    addon's file: N" with N above zero and no "Cannot use" line. If it names a problem, that form needs
+    handling; the log (`companion.log`) holds the same line once per rewrite.
+15. **The hub behind Caddy**: `PUBLIC_URL` is `https://`, `TRUST_PROXY=1`, and Caddy passes the `X-FF-*`
     headers and the body unchanged: a link from a member's PC, then a sync, is the test.
-14. **Line endings of the real `ForeverFriends.lua`**: the parser reads CRLF and LF, but check what the client writes:
-    `Get-Content "<game>\WTF\Account\<ACCOUNT>\SavedVariables\ForeverFriends.lua" -Raw | Select-String "`r`n" -Quiet`
-    (True means CRLF); then `ForeverFriendsCompanion.exe run --once` should print `sync: ok` either way.

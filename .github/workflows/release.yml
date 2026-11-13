@@ -26,11 +26,13 @@ jobs:
           fi
       - run: sudo apt-get install -y lua5.1
       - run: go vet ./... && go test ./...
-      - name: Build Windows and Linux
+      - name: Build Windows, Linux and macOS
         run: |
           mkdir dist
           GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H=windowsgui" -o dist/ForeverFriendsCompanion-windows-amd64.exe ./companion
           GOOS=linux GOARCH=amd64 go build -trimpath -o dist/ForeverFriendsCompanion-linux-amd64 ./companion
+          GOOS=darwin GOARCH=arm64 go build -trimpath -o dist/ForeverFriendsCompanion-macos-arm64 ./companion
+          GOOS=darwin GOARCH=amd64 go build -trimpath -o dist/ForeverFriendsCompanion-macos-amd64 ./companion
           (cd dist && sha256sum * > SHA256SUMS)
       - uses: actions/upload-artifact@v4
         if: github.ref_type != 'tag'
