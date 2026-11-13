@@ -75,8 +75,10 @@ A question only the owner can answer is asked, in either mode.
 The authority is `CLAUDE.md` ("Facts that do not move") and `docs/DECISIONS.md` D5, D7, D8.
 
 - Read, never act: no protected call, nothing that spends, moves or automates (D5).
-- SavedVariables is an addon's only output. The companion reads one SavedVariables file per
-  account and writes only inside the two ForeverFriends addon folders (D7).
+- SavedVariables is an addon's only output. Inside the game folder the companion reads one
+  SavedVariables file per account and writes only inside the two ForeverFriends addon folders;
+  outside it, it keeps its own config folder, program copy and autostart entry and nothing
+  else (D7, `docs/CONTRACT.md` §5).
 - Only what `docs/CONTRACT.md` lists crosses the wire; its §5 says what never does.
 - Text typed on the hub reaches the game only under the escaping rule of `docs/CONTRACT.md`
   §2, and the addon treats that data as untrusted.
