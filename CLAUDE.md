@@ -30,17 +30,17 @@ style applies here too (lightweight, decisions written down, the owner merges).
   owner sees the pull request. `.claude/agents/CLAUDE.md` is the fleet's manual and
   `.claude/agents.local.md` this repository's answers to it. A session whose list of agents
   does not show the fleet runs a definition through the manual's fallback. The tracker's
-  scripts, boards and hooks are not taken: this stays lightweight.
+  scripts, boards and hooks are not taken: this stays lightweight. Activate the hooks once per
+  clone with `git config core.hooksPath .githooks`; `post-checkout` fills the fleet submodule
+  in a new worktree, which a cloud session can only do when `Atomtomate/agents` is among its
+  repositories.
 - Each addon is independent: its own TOC, its own `spec/`, no shared Lua between addons unless
   a decision says so. Shared things are tooling only.
 - Pure logic (packing, maths, parsing) lives in files with no client globals so busted can load
   them without the simulated client. Client-facing code is thin and tested through
   `spec/support/wow.lua`.
 - `make lint test` must pass before a commit (`.githooks/pre-commit`, same as CI). Lint fails
-  on an unlisted global: list it in `.luacheckrc` or make it local. Activate the hooks once per
-  clone with `git config core.hooksPath .githooks`; `post-checkout` fills the fleet submodule
-  in a new worktree, which a cloud session can only do when `Atomtomate/agents` is among its
-  repositories.
+  on an unlisted global: list it in `.luacheckrc` or make it local.
 - What a test cannot prove is written into the addon's `docs/` note as "verify in client" and
   into `docs/HANDOFF.md`, with the exact `/dump` or `/run` line to try.
 - Draft PRs; the owner says merge. Ask before a new library dependency (Ace3 and the like), a
