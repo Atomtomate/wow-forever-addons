@@ -78,7 +78,7 @@ func TestStatusTable(t *testing.T) {
 	}
 }
 
-func TestRedirectNotFollowed(t *testing.T) {
+func TestRedirectNotFollowedEvenOnAClientThatFollows(t *testing.T) {
 	var hits atomic.Int32
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { hits.Add(1) }))
 	defer target.Close()
@@ -86,7 +86,7 @@ func TestRedirectNotFollowed(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, target.URL, code)
 		}))
-		cl := &hubapi.Client{Origin: srv.URL, Device: "0123456789abcdef", Key: seedKey(), Seq: &memSeq{}, HTTP: hubapi.NewHTTPClient(time.Second)}
+		cl := &hubapi.Client{Origin: srv.URL, Device: "0123456789abcdef", Key: seedKey(), Seq: &memSeq{}, HTTP: &http.Client{Timeout: time.Second}}
 		_, res := cl.Sync(context.Background(), wire.SyncRequest{V: 1})
 		srv.Close()
 		if res.Outcome != hubapi.Unreachable || hits.Load() != 0 {
@@ -128,7 +128,7 @@ func TestSyncParsesRosterAndShape(t *testing.T) {
 	cl := linked(t, h)
 	h.Roster = `{"members":[{"name":"Anna","characters":[{"name":"T","class":"Shaman","level":23,"main":true}]}]}`
 	out, res := cl.Sync(context.Background(), wire.SyncRequest{V: 1})
-	if res.Outcome != hubapi.OK || out.Roster == nil || out.Roster.Members[0].Characters[0].Level != 23 || out.Member != "Anna" {
+	if res.Outcome != hubapi.OK || out.Roster == nil || out.Roster.Members[0].Characters[0].Level != 23 {
 		t.Fatalf("%+v %v", out, res.Outcome)
 	}
 	h.Roster = `{"members":"nope"}`

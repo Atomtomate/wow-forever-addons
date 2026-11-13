@@ -6,8 +6,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/Atomtomate/wow-forever-addons/companion/internal/hubapi"
 	"github.com/Atomtomate/wow-forever-addons/companion/internal/platform"
 )
+
+const httpTimeout = 20 * time.Second
 
 // DefaultEnv is the real thing: the real clock, the real operating system, the embedded addon.
 func DefaultEnv(addon iofs.FS) Env {
@@ -16,11 +19,11 @@ func DefaultEnv(addon iofs.FS) Env {
 		Sleep:    sleep,
 		Addon:    addon,
 		Hostname: os.Hostname,
+		HTTP:     hubapi.NewHTTPClient(httpTimeout),
 		P: Platform{
 			ConfigDir:       platform.ConfigDir,
 			ProgramDir:      platform.ProgramDir,
 			Executable:      platform.Executable,
-			QueryVersion:    platform.QueryVersion,
 			GameCandidates:  platform.GameCandidates,
 			ListImages:      platform.ListImages,
 			OpenURL:         platform.OpenURL,

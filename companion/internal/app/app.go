@@ -16,7 +16,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/Atomtomate/wow-forever-addons/companion/internal/config"
 	"github.com/Atomtomate/wow-forever-addons/companion/internal/hubapi"
@@ -37,10 +36,9 @@ const (
 )
 
 const (
-	programFile     = "ForeverFriendsCompanion.exe"
-	stopWait        = 45 * time.Second
-	logMaxBytes     = 256 << 10
-	deviceNameLimit = 40
+	programFile = "ForeverFriendsCompanion.exe"
+	stopWait    = 45 * time.Second
+	logMaxBytes = 256 << 10
 )
 
 // Platform is every operating-system call the commands make.
@@ -48,11 +46,10 @@ type Platform struct {
 	ConfigDir       func() (string, error)
 	ProgramDir      func() string
 	Executable      func() (string, error)
-	QueryVersion    func(exe string) string
 	GameCandidates  func() []string
 	ListImages      func() ([]string, error)
 	OpenURL         func(url string) error
-	SetAutostart    func(exe string) error
+	SetAutostart    func(exe string, args ...string) error
 	RemoveAutostart func() error
 	SpawnDetached   func(exe string, args ...string) error
 	PrepareConsole  func()
@@ -78,9 +75,8 @@ func Main(ctx context.Context, args []string, env Env) int {
 	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
 		cmd, args = args[0], args[1:]
 	}
-	// run is the background command and must never show a window; version is read by setup
-	// through a pipe, which attaching to a console would bypass.
-	if cmd != "run" && cmd != "version" && cmd != "--version" && env.P.PrepareConsole != nil {
+	// run is the background command and must never show a window.
+	if cmd != "run" && env.P.PrepareConsole != nil {
 		env.P.PrepareConsole()
 	}
 	if env.Stdin == nil {
@@ -91,9 +87,6 @@ func Main(ctx context.Context, args []string, env Env) int {
 	}
 	if env.Stderr == nil {
 		env.Stderr = os.Stderr
-	}
-	if env.HTTP == nil {
-		env.HTTP = hubapi.NewHTTPClient(20 * time.Second)
 	}
 	toc, err := install.ReadToc(env.Addon)
 	if err != nil {
@@ -110,7 +103,7 @@ func Main(ctx context.Context, args []string, env Env) int {
 		return c.status(args)
 	case "remove":
 		return c.remove(ctx, args)
-	case "version", "--version":
+	case "version":
 		fmt.Fprintln(env.Stdout, c.version)
 		return ExitOK
 	}
@@ -147,6 +140,20 @@ func (c *cmdCtx) configDir(flagValue string) (config.Dir, error) {
 	return config.Dir(d), nil
 }
 
+// client builds the signed client for the linked device in dir. The hub's address is checked
+// again here: the config file is a file anyone on the PC can edit.
+func (c *cmdCtx) client(dir config.Dir, cfg config.Config, store *config.Store) (*hubapi.Client, error) {
+	key, err := dir.LoadKey()
+	if err != nil {
+		return nil, fmt.Errorf("the key is unreadable: %w", err)
+	}
+	hub, err := hubapi.ParseOrigin(cfg.Hub)
+	if err != nil {
+		return nil, fmt.Errorf("the saved site address is unusable: %w", err)
+	}
+	return &hubapi.Client{Origin: hub, Device: cfg.Device, Key: key, Seq: store, HTTP: c.env.HTTP, UserAgent: c.userAgent()}, nil
+}
+
 func (c *cmdCtx) isDir(p string) bool {
 	st, err := os.Stat(p)
 	return err == nil && st.IsDir()
@@ -158,24 +165,6 @@ func (c *cmdCtx) samePath(a, b string) bool {
 		return strings.EqualFold(a, b)
 	}
 	return a == b
-}
-
-// cleanDeviceName drops control characters and cuts to the length the hub keeps.
-func cleanDeviceName(s string) string {
-	var out []rune
-	for _, r := range s {
-		if !unicode.IsControl(r) && !unicode.Is(unicode.Cf, r) {
-			out = append(out, r)
-		}
-	}
-	name := strings.TrimSpace(string(out))
-	if r := []rune(name); len(r) > deviceNameLimit {
-		name = string(r[:deviceNameLimit])
-	}
-	if name == "" {
-		return "PC"
-	}
-	return name
 }
 
 type ui struct {

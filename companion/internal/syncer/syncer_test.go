@@ -2,7 +2,7 @@ package syncer
 
 import (
 	"context"
-	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -23,7 +23,7 @@ func (h *stubHub) Sync(_ context.Context, req wire.SyncRequest) (wire.SyncRespon
 }
 
 func ok(etag string, roster *wire.Roster) (wire.SyncResponse, hubapi.Result) {
-	return wire.SyncResponse{OK: true, RosterEtag: etag, Roster: roster}, hubapi.Result{Outcome: hubapi.OK, Status: 200}
+	return wire.SyncResponse{RosterEtag: etag, Roster: roster}, hubapi.Result{Outcome: hubapi.OK, Status: 200}
 }
 
 func res(o hubapi.Outcome, status int) (wire.SyncResponse, hubapi.Result) {
@@ -37,7 +37,7 @@ type rig struct {
 	running  bool
 	snap     savedvars.Snapshot
 	store    *config.Store
-	rosterOn bool
+	fileHash string // what is in Data.lua now; "" means no file
 	written  []wire.Roster
 	writeErr error
 	logs     []string
@@ -48,12 +48,13 @@ func newRig(t *testing.T) *rig {
 	r.hub.next = func(int, wire.SyncRequest) (wire.SyncResponse, hubapi.Result) { return ok("", nil) }
 	r.store, _ = config.Dir(t.TempDir()).OpenStore()
 	r.s = New(Deps{Hub: r.hub, Now: func() time.Time { return r.now }, Running: func() bool { return r.running },
-		Read: func() savedvars.Snapshot { return r.snap }, Store: r.store, RosterFileExists: func() bool { return r.rosterOn },
+		Read: func() savedvars.Snapshot { return r.snap }, Store: r.store, RosterHash: func() string { return r.fileHash },
 		WriteRoster: func(ro wire.Roster, _ time.Time) error {
 			if r.writeErr != nil {
 				return r.writeErr
 			}
 			r.written = append(r.written, ro)
+			r.fileHash = "hash-of-" + ro.Members[0].Name
 			return nil
 		}, Log: func(f string, a ...any) { r.logs = append(r.logs, f) }})
 	return r
@@ -172,9 +173,8 @@ func TestOneFailureNoOutageTwoFailuresOutageOnce(t *testing.T) {
 	if outages[0].From != from {
 		t.Fatalf("from %s want %s", outages[0].From, from)
 	}
-	b, _ := json.Marshal(outages[0])
-	if len(b) == 0 || outages[0].To <= outages[0].From {
-		t.Fatal("bad outage", string(b))
+	if outages[0].To <= outages[0].From {
+		t.Fatal("outage ends before it starts")
 	}
 }
 
@@ -199,38 +199,38 @@ func TestOutageKeptWhileRequestCarryingItFails(t *testing.T) {
 	}
 }
 
-func TestRetry30ThenSlower(t *testing.T) {
-	r := newRig(t)
-	r.running = true
-	r.hub.next = func(n int, q wire.SyncRequest) (wire.SyncResponse, hubapi.Result) {
-		if n == 1 {
-			return ok("", nil)
+func TestRetry30ThenSlowerButNeverSlowerThanNormal(t *testing.T) {
+	retries := func(running bool) []time.Duration {
+		r := newRig(t)
+		r.running = running
+		r.hub.next = func(int, wire.SyncRequest) (wire.SyncResponse, hubapi.Result) { return res(hubapi.Unreachable, 500) }
+		var times []time.Time
+		for i := 0; i < 300; i++ {
+			before := len(r.hub.reqs)
+			r.s.Tick(context.Background())
+			if len(r.hub.reqs) > before {
+				times = append(times, r.now)
+			}
+			r.now = r.now.Add(TickEvery)
 		}
-		return res(hubapi.Unreachable, 500)
-	}
-	r.advance(TickEvery) // request 1
-	r.advance(RunningEvery)
-	// failures begin at t=60 s; the next five retries are 30 s apart (rounded to ticks), then 120 s
-	var times []time.Time
-	r2 := newRig(t)
-	r2.hub.next = func(n int, q wire.SyncRequest) (wire.SyncResponse, hubapi.Result) {
-		return res(hubapi.Unreachable, 500)
-	}
-	for i := 0; i < 200; i++ {
-		before := len(r2.hub.reqs)
-		r2.s.Tick(context.Background())
-		if len(r2.hub.reqs) > before {
-			times = append(times, r2.now)
+		var gaps []time.Duration
+		for i := 1; i < len(times); i++ {
+			gaps = append(gaps, times[i].Sub(times[i-1]))
 		}
-		r2.now = r2.now.Add(TickEvery)
+		return gaps
 	}
-	for i := 1; i <= FastRetries && i < len(times); i++ {
-		if d := times[i].Sub(times[i-1]); d != RetryFast {
-			t.Fatalf("retry %d after %v", i, d)
+	idle := retries(false)
+	for i := 0; i < FastRetries; i++ {
+		if idle[i] != RetryFast {
+			t.Fatalf("retry %d after %v", i+1, idle[i])
 		}
 	}
-	if d := times[FastRetries+1].Sub(times[FastRetries]); d != RetrySlow {
-		t.Fatalf("slow retry after %v", d)
+	if idle[FastRetries] != RetrySlow {
+		t.Fatalf("slow retry after %v", idle[FastRetries])
+	}
+	running := retries(true)
+	if running[FastRetries] != RunningEvery {
+		t.Fatalf("while the game runs the slow retry came after %v, not the normal %v", running[FastRetries], RunningEvery)
 	}
 }
 
@@ -238,13 +238,13 @@ func TestUnauthorizedRevokesAndPersists(t *testing.T) {
 	r := newRig(t)
 	r.hub.next = func(int, wire.SyncRequest) (wire.SyncResponse, hubapi.Result) { return res(hubapi.Unlinked, 401) }
 	r.advance(TickEvery)
-	if r.s.Status() != Revoked || !r.store.Snapshot().Revoked {
+	if !r.s.Revoked() || !r.store.Snapshot().Revoked {
 		t.Fatal("not revoked")
 	}
 	if n := r.advance(time.Hour); n != 0 {
 		t.Fatal("kept sending after 401")
 	}
-	if New(Deps{Store: r.store}).Status() != Revoked {
+	if !New(Deps{Store: r.store}).Revoked() {
 		t.Fatal("a new run forgot the revocation")
 	}
 }
@@ -260,7 +260,7 @@ func TestRejectedMarksUploadedAndKeepsSchedule(t *testing.T) {
 	if len(r.hub.reqs) != 2 || len(r.hub.reqs[1].Characters) != 0 {
 		t.Fatalf("%d requests", len(r.hub.reqs))
 	}
-	if r.s.Status() != Healthy {
+	if r.s.LastOutcome() != hubapi.Rejected || r.s.fails != 0 {
 		t.Fatal("400 means the hub was reached")
 	}
 }
@@ -283,12 +283,12 @@ func TestThrottleWaits300AndIsNeitherFailureNorOutage(t *testing.T) {
 			t.Fatal("429 produced an outage")
 		}
 	}
-	if r.s.Status() != Healthy {
-		t.Fatal(r.s.Status())
+	if r.s.LastOutcome() != hubapi.OK || r.s.fails != 0 {
+		t.Fatal("not healthy after the throttle")
 	}
 }
 
-func TestRosterEtagAndWrite(t *testing.T) {
+func TestRosterEtagSentOnlyWhileTheFileHoldsWhatWeWrote(t *testing.T) {
 	r := newRig(t)
 	roster := &wire.Roster{Members: []wire.RosterMember{{Name: "Anna"}}}
 	r.hub.next = func(n int, q wire.SyncRequest) (wire.SyncResponse, hubapi.Result) {
@@ -297,18 +297,24 @@ func TestRosterEtagAndWrite(t *testing.T) {
 		}
 		return ok("e1", roster)
 	}
+	last := func() string { return r.hub.reqs[len(r.hub.reqs)-1].RosterEtag }
 	r.advance(TickEvery)
 	if r.hub.reqs[0].RosterEtag != "" || len(r.written) != 1 || r.store.Snapshot().RosterEtag != "e1" {
 		t.Fatal("first roster not stored")
 	}
 	r.advance(IdleEvery)
-	if r.hub.reqs[1].RosterEtag != "" {
-		t.Fatal("etag sent while Data.lua does not exist")
+	if last() != "e1" || len(r.written) != 1 {
+		t.Fatalf("etag %q while the file is as written", last())
 	}
-	r.rosterOn = true
+	r.fileHash = "" // the file is gone (the game's folder was reset)
 	r.advance(IdleEvery)
-	if got := r.hub.reqs[len(r.hub.reqs)-1].RosterEtag; got != "e1" {
-		t.Fatalf("etag %q", got)
+	if last() != "" || len(r.written) != 2 {
+		t.Fatalf("etag %q sent without the file, %d writes", last(), len(r.written))
+	}
+	r.fileHash = "the empty first file of another game folder"
+	r.advance(IdleEvery)
+	if last() != "" {
+		t.Fatalf("etag %q sent for a file we did not write", last())
 	}
 }
 
@@ -338,8 +344,8 @@ func TestWakeFromSleepForgivesFailures(t *testing.T) {
 			t.Fatal("outage from the first minute after a wake")
 		}
 	}
-	if r.s.Status() != Healthy {
-		t.Fatal(r.s.Status())
+	if r.s.LastOutcome() != hubapi.OK || r.s.fails != 0 {
+		t.Fatal("not healthy after the wake")
 	}
 }
 
@@ -349,5 +355,25 @@ func TestRunStopsOnRequest(t *testing.T) {
 	err := r.s.Run(context.Background(), func(context.Context, time.Duration) error { r.now = r.now.Add(TickEvery); ticks++; return nil }, func() bool { return ticks >= 3 })
 	if err != nil || ticks != 3 || len(r.hub.reqs) != 1 {
 		t.Fatal(err, ticks, len(r.hub.reqs))
+	}
+}
+
+func TestUnreadableFileIsLoggedOncePerRewrite(t *testing.T) {
+	r := newRig(t)
+	bad := func(fp string) savedvars.Snapshot {
+		return savedvars.Snapshot{Files: []savedvars.File{{Path: "WTF/A.lua", Fingerprint: fp, Problem: "cut off"}}}
+	}
+	r.snap = bad("1-1")
+	r.advance(3 * TickEvery)
+	r.snap = bad("2-2")
+	r.advance(3 * TickEvery)
+	n := 0
+	for _, l := range r.logs {
+		if strings.HasPrefix(l, "cannot use") {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Fatalf("%d lines for two rewrites: %v", n, r.logs)
 	}
 }

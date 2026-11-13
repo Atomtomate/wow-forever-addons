@@ -5,6 +5,7 @@ package syncer
 
 import (
 	"context"
+	"maps"
 	"time"
 
 	"github.com/Atomtomate/wow-forever-addons/companion/internal/config"
@@ -31,17 +32,6 @@ const (
 	timeFormat  = "2006-01-02T15:04:05Z"
 )
 
-// Status is where the loop stands with the hub.
-type Status int
-
-// The states.
-const (
-	Idle    Status = iota // nothing sent yet in this run
-	Healthy               // the last request was answered
-	Failing               // requests are failing; two in a row make an outage
-	Revoked               // the hub answered 401: this PC is no longer linked
-)
-
 // Hub is the part of hubapi.Client the loop uses.
 type Hub interface {
 	Sync(ctx context.Context, req wire.SyncRequest) (wire.SyncResponse, hubapi.Result)
@@ -49,20 +39,21 @@ type Hub interface {
 
 // Deps is everything the loop reaches outside itself through.
 type Deps struct {
-	Hub              Hub
-	Now              func() time.Time
-	Running          func() bool
-	Read             func() savedvars.Snapshot
-	Store            *config.Store
-	RosterFileExists func() bool
-	WriteRoster      func(wire.Roster, time.Time) error
-	Log              func(format string, args ...any)
+	Hub     Hub
+	Now     func() time.Time
+	Running func() bool
+	Read    func() savedvars.Snapshot
+	Store   *config.Store
+	// RosterHash names the member list now in the game folder (dataaddon.Hash), "" if none.
+	RosterHash  func() string
+	WriteRoster func(wire.Roster, time.Time) error
+	Log         func(format string, args ...any)
 }
 
 // Syncer holds the loop's memory.
 type Syncer struct {
 	d           Deps
-	status      Status
+	revoked     bool
 	last        hubapi.Outcome
 	lastTick    time.Time
 	haveRunning bool
@@ -72,19 +63,16 @@ type Syncer struct {
 	firstFail   time.Time
 	graceUntil  time.Time
 	prevFP      map[string]string
+	reported    map[string]string // fingerprints of files already reported as unreadable
 }
 
 // New returns a loop that has not sent anything.
 func New(d Deps) *Syncer {
-	s := &Syncer{d: d}
-	if d.Store != nil && d.Store.Snapshot().Revoked {
-		s.status = Revoked
-	}
-	return s
+	return &Syncer{d: d, revoked: d.Store.Snapshot().Revoked, reported: map[string]string{}}
 }
 
-// Status reports the state.
-func (s *Syncer) Status() Status { return s.status }
+// Revoked reports whether the hub answered 401: this PC is no longer linked.
+func (s *Syncer) Revoked() bool { return s.revoked }
 
 // LastOutcome is the outcome of the most recent request.
 func (s *Syncer) LastOutcome() hubapi.Outcome { return s.last }
@@ -96,13 +84,14 @@ func every(running bool) time.Duration {
 	return IdleEvery
 }
 
-// Tick looks at the game and the files, and sends when something is due. It reports whether it
-// sent a request.
-func (s *Syncer) Tick(ctx context.Context) bool {
-	if s.status == Revoked {
-		return false
+// Tick looks at the game and the files, and sends when something is due.
+func (s *Syncer) Tick(ctx context.Context) {
+	if s.revoked {
+		return
 	}
-	now := s.d.Now()
+	// Round(0) drops the monotonic reading, which stops while a Linux or macOS PC sleeps: the
+	// gap that tells a resume from sleep is measured on the wall clock.
+	now := s.d.Now().Round(0)
 	if !s.lastTick.IsZero() && now.Sub(s.lastTick) > ResumeGap {
 		s.fails, s.firstFail = 0, time.Time{}
 		s.graceUntil = now.Add(ResumeGrace)
@@ -121,31 +110,23 @@ func (s *Syncer) Tick(ctx context.Context) bool {
 	fps, dirty := map[string]string{}, false
 	for _, f := range snap.Files {
 		fps[f.Path] = f.Fingerprint
+		if !f.OK && s.reported[f.Path] != f.Fingerprint {
+			// Once per rewrite: a file the client is still writing is read again next tick.
+			s.reported[f.Path] = f.Fingerprint
+			s.d.Log("cannot use %s: %s", f.Path, f.Problem)
+		}
 		if f.OK && state.Uploaded[f.Path] != f.Fingerprint {
 			dirty = true
 		}
 	}
-	if dirty && s.fails == 0 && !sameFingerprints(fps, s.prevFP) {
+	if dirty && s.fails == 0 && !maps.Equal(fps, s.prevFP) {
 		s.nextDue = now
 	}
 	s.prevFP = fps
 	if now.Before(s.nextDue) {
-		return false
+		return
 	}
 	s.send(ctx, now, snap, state, dirty)
-	return true
-}
-
-func sameFingerprints(a, b map[string]string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for k, v := range a {
-		if b[k] != v {
-			return false
-		}
-	}
-	return true
 }
 
 func (s *Syncer) send(ctx context.Context, now time.Time, snap savedvars.Snapshot, state config.State, dirty bool) {
@@ -156,7 +137,7 @@ func (s *Syncer) send(ctx context.Context, now time.Time, snap savedvars.Snapsho
 	if s.fails >= 2 && !s.firstFail.IsZero() {
 		req.Outage = &wire.Outage{From: s.firstFail.UTC().Format(timeFormat), To: now.UTC().Format(timeFormat)}
 	}
-	if state.RosterEtag != "" && s.d.RosterFileExists() {
+	if h := s.d.RosterHash(); state.RosterEtag != "" && h != "" && h == state.RosterHash {
 		req.RosterEtag = state.RosterEtag
 	}
 	resp, res := s.d.Hub.Sync(ctx, req)
@@ -169,7 +150,8 @@ func (s *Syncer) send(ctx context.Context, now time.Time, snap savedvars.Snapsho
 			if err := s.d.WriteRoster(*resp.Roster, now); err != nil {
 				s.d.Log("could not write the member list: %v", err)
 			} else if resp.RosterEtag != "" {
-				s.save(func(st *config.State) { st.RosterEtag = resp.RosterEtag })
+				h := s.d.RosterHash()
+				s.save(func(st *config.State) { st.RosterEtag, st.RosterHash = resp.RosterEtag, h })
 			}
 		}
 	case hubapi.Rejected:
@@ -181,7 +163,7 @@ func (s *Syncer) send(ctx context.Context, now time.Time, snap savedvars.Snapsho
 	case hubapi.Throttled:
 		s.nextDue = now.Add(ThrottleWait)
 	case hubapi.Unlinked:
-		s.status = Revoked
+		s.revoked = true
 		s.save(func(st *config.State) { st.Revoked = true })
 		s.d.Log("the site no longer knows this PC; syncing stopped. Run the companion again to link it")
 	default:
@@ -194,7 +176,7 @@ func (s *Syncer) heard(now time.Time) {
 	if s.fails >= 2 {
 		s.d.Log("the site is reachable again after %d failed requests", s.fails)
 	}
-	s.status, s.fails, s.firstFail = Healthy, 0, time.Time{}
+	s.fails, s.firstFail = 0, time.Time{}
 	s.nextDue = now.Add(every(s.running))
 }
 
@@ -207,14 +189,14 @@ func (s *Syncer) failed(now time.Time, res hubapi.Result) {
 	if s.fails == 1 {
 		s.firstFail = now
 	}
-	s.status = Failing
 	if s.fails == 1 || s.fails == 2 {
 		s.d.Log("the site is not reachable (status %d %s)", res.Status, res.Error)
 	}
 	if s.fails <= FastRetries {
 		s.nextDue = now.Add(RetryFast)
 	} else {
-		s.nextDue = now.Add(RetrySlow)
+		// After five failures a retry is slower, but never slower than the normal pace.
+		s.nextDue = now.Add(min(RetrySlow, every(s.running)))
 	}
 }
 
@@ -243,7 +225,7 @@ func (s *Syncer) save(f func(*config.State)) {
 // Run ticks until the context ends, the loop is revoked or stop reports true. sleep waits on
 // the caller's clock.
 func (s *Syncer) Run(ctx context.Context, sleep func(context.Context, time.Duration) error, stop func() bool) error {
-	for s.status != Revoked {
+	for !s.revoked {
 		if stop() {
 			return nil
 		}

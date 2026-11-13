@@ -9,10 +9,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Atomtomate/wow-forever-addons/companion/internal/config"
 	"github.com/Atomtomate/wow-forever-addons/companion/internal/hubapi"
+	"github.com/Atomtomate/wow-forever-addons/companion/internal/wire"
 )
 
 // Errors the caller turns into words for the member.
@@ -30,62 +32,50 @@ type Env struct {
 	Sleep     func(context.Context, time.Duration) error
 }
 
-// Pending is a started link the member has not approved yet.
-type Pending struct {
-	Code     string
-	Expires  time.Time
-	Interval time.Duration
-}
-
-const defaultInterval = 5 * time.Second
-
 // Resume returns the link a closed companion left behind, while it has not expired and belongs
 // to the same hub; a new start would only spend the hub's limit on link starts.
-func Resume(cfg config.Config, hub string, now time.Time) (Pending, bool) {
+func Resume(cfg config.Config, hub string, now time.Time) (config.Pending, bool) {
 	p := cfg.Pending
-	if p == nil || cfg.Hub != hub || cfg.Device == "" || !now.Before(time.Unix(p.ExpiresUnix, 0)) {
-		return Pending{}, false
+	if p == nil || cfg.Hub != hub || cfg.Device == "" || !now.Before(p.Expires()) {
+		return config.Pending{}, false
 	}
-	iv := time.Duration(p.IntervalSec) * time.Second
-	if iv <= 0 {
-		iv = defaultInterval
-	}
-	return Pending{Code: p.Code, Expires: time.Unix(p.ExpiresUnix, 0), Interval: iv}, true
+	return *p, true
 }
 
 // Start makes a new key pair, asks the hub for a code and stores the key, the device id, the
-// code and the expiry before returning, so that a member who closes the window can resume.
-func Start(ctx context.Context, e Env, dir config.Dir, store *config.Store, hub, deviceName string) (Pending, error) {
+// code and the expiry before returning, so that a member who closes the window can resume. The
+// PC's name is cut to what the hub keeps; the hub cleans it.
+func Start(ctx context.Context, e Env, dir config.Dir, store *config.Store, hub, deviceName string) (config.Pending, error) {
 	pub, key, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		return Pending{}, err
+		return config.Pending{}, err
+	}
+	if r := []rune(strings.TrimSpace(deviceName)); len(r) > wire.MaxDeviceName {
+		deviceName = string(r[:wire.MaxDeviceName])
 	}
 	out, res := hubapi.StartLink(ctx, e.HTTP, hub, e.UserAgent, deviceName, pub)
 	switch res.Outcome {
 	case hubapi.OK:
 	case hubapi.Throttled:
-		return Pending{}, ErrBusy
+		return config.Pending{}, ErrBusy
 	case hubapi.Rejected:
-		return Pending{}, fmt.Errorf("%w: %s", ErrRejected, res.Error)
+		return config.Pending{}, fmt.Errorf("%w: %s", ErrRejected, res.Error)
 	default:
-		return Pending{}, fmt.Errorf("could not reach the site (%s)", reason(res))
+		return config.Pending{}, fmt.Errorf("could not reach the site (%s)", reason(res))
 	}
 	cfg, err := dir.Load()
 	if err != nil {
-		return Pending{}, err
+		return config.Pending{}, err
 	}
-	p := Pending{Code: out.UserCode, Expires: e.Now().Add(time.Duration(out.ExpiresIn) * time.Second), Interval: time.Duration(out.Interval) * time.Second}
-	if p.Interval <= 0 {
-		p.Interval = defaultInterval
-	}
+	p := config.Pending{Code: out.UserCode, ExpiresUnix: e.Now().Add(time.Duration(out.ExpiresIn) * time.Second).Unix(), IntervalSec: out.Interval}
 	if err := dir.SaveKey(key); err != nil {
-		return Pending{}, err
+		return config.Pending{}, err
 	}
 	if err := store.Reset(); err != nil {
-		return Pending{}, err
+		return config.Pending{}, err
 	}
 	cfg.Hub, cfg.Device, cfg.DeviceName, cfg.Member = hub, out.Device, deviceName, ""
-	cfg.Pending = &config.Pending{Code: p.Code, ExpiresUnix: p.Expires.Unix(), IntervalSec: int(p.Interval / time.Second)}
+	cfg.Pending = &p
 	return p, dir.Save(cfg)
 }
 
@@ -96,22 +86,25 @@ func reason(r hubapi.Result) string {
 	return fmt.Sprintf("status %d", r.Status)
 }
 
-// Wait asks the hub every interval until the member approved the code. It returns the member's
-// name and clears the pending link from the config; ErrExpired when the time ran out or the
-// hub answered 401 (expired or declined).
-func Wait(ctx context.Context, e Env, dir config.Dir, store *config.Store, p Pending) (string, error) {
+// Wait asks the hub every interval until the member approved the code, with c, the client for
+// the device Start made. It returns the member's name and clears the pending link from the
+// config; ErrExpired when the time ran out or the hub answered 401 (expired or declined), which
+// also clears the link so that the next run starts a new one instead of showing a dead code.
+func Wait(ctx context.Context, e Env, c *hubapi.Client, dir config.Dir, p config.Pending) (string, error) {
 	cfg, err := dir.Load()
 	if err != nil {
 		return "", err
 	}
-	key, err := dir.LoadKey()
-	if err != nil {
-		return "", err
+	expire := func() (string, error) {
+		cfg.Pending = nil
+		if err := dir.Save(cfg); err != nil {
+			return "", err
+		}
+		return "", ErrExpired
 	}
-	c := &hubapi.Client{Origin: cfg.Hub, Device: cfg.Device, Key: key, Seq: store, HTTP: e.HTTP, UserAgent: e.UserAgent}
 	for {
-		if !e.Now().Before(p.Expires) {
-			return "", ErrExpired
+		if !e.Now().Before(p.Expires()) {
+			return expire()
 		}
 		st, res := c.LinkStatus(ctx)
 		switch res.Outcome {
@@ -121,12 +114,12 @@ func Wait(ctx context.Context, e Env, dir config.Dir, store *config.Store, p Pen
 				return st.Member, dir.Save(cfg)
 			}
 		case hubapi.Unlinked:
-			return "", ErrExpired
+			return expire()
 		case hubapi.Rejected:
 			return "", fmt.Errorf("%w: %s", ErrRejected, res.Error)
 		}
 		// Any other answer is asked again at the same interval until the expiry.
-		if err := e.Sleep(ctx, p.Interval); err != nil {
+		if err := e.Sleep(ctx, p.Interval()); err != nil {
 			return "", err
 		}
 	}

@@ -10,6 +10,9 @@ import (
 	"time"
 )
 
+// Files returns the log's file and the one it rotates to, for whoever deletes them.
+func Files(path string) []string { return []string{path, path + ".1"} }
+
 // Logger appends lines to a file and moves it to path+".1" once it passes max bytes.
 type Logger struct {
 	path string
@@ -29,7 +32,7 @@ func (l *Logger) Printf(format string, a ...any) {
 	defer l.mu.Unlock()
 	_ = os.MkdirAll(filepath.Dir(l.path), 0o700)
 	if st, err := os.Stat(l.path); err == nil && st.Size() > l.max {
-		_ = os.Rename(l.path, l.path+".1")
+		_ = os.Rename(l.path, Files(l.path)[1])
 	}
 	f, err := os.OpenFile(l.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {

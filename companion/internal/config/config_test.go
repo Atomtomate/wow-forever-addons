@@ -63,20 +63,3 @@ func TestSeqMonotonicAcrossReopen(t *testing.T) {
 		t.Fatal(n)
 	}
 }
-
-func TestAtomicWriteLeavesNoTemp(t *testing.T) {
-	d := t.TempDir()
-	p := d + "/f"
-	if err := WriteFileAtomic(p, []byte("a"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := WriteFileAtomic(p, []byte("b"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if b, _ := os.ReadFile(p); string(b) != "b" {
-		t.Fatal(string(b))
-	}
-	if _, err := os.Stat(p + ".tmp"); err == nil {
-		t.Fatal("temp left")
-	}
-}

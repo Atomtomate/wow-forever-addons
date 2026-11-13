@@ -2,6 +2,7 @@ package install_test
 
 import (
 	"io/fs"
+	"regexp"
 	"testing"
 
 	foreverfriends "github.com/Atomtomate/wow-forever-addons"
@@ -15,6 +16,10 @@ func TestEmbeddedAddonHoldsEveryFileItsTocLists(t *testing.T) {
 	toc, err := install.ReadToc(src)
 	if err != nil {
 		t.Fatal(err)
+	}
+	// The data addon's .toc copies this value without checking it.
+	if !regexp.MustCompile(`^[0-9]+(,[0-9]+)*$`).MatchString(toc.Interface) {
+		t.Fatalf("the embedded Interface value %q is not a number list", toc.Interface)
 	}
 	if len(toc.Files) == 0 {
 		t.Fatal("the embedded .toc lists no files")

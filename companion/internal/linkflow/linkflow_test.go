@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/Atomtomate/wow-forever-addons/companion/internal/config"
 	"github.com/Atomtomate/wow-forever-addons/companion/internal/hubapi"
 	"github.com/Atomtomate/wow-forever-addons/companion/internal/hubfake"
+	"github.com/Atomtomate/wow-forever-addons/companion/internal/wire"
 )
 
 type fixture struct {
@@ -37,6 +39,12 @@ func setup(t *testing.T) *fixture {
 	return f
 }
 
+func (f *fixture) client() *hubapi.Client {
+	cfg, _ := f.dir.Load()
+	key, _ := f.dir.LoadKey()
+	return &hubapi.Client{Origin: cfg.Hub, Device: cfg.Device, Key: key, Seq: f.store, HTTP: f.env.HTTP, UserAgent: "t"}
+}
+
 func TestStartStoresEverythingThenWaitReturnsMember(t *testing.T) {
 	f := setup(t)
 	p, err := Start(context.Background(), f.env, f.dir, f.store, f.h.URL, "JULIAN-PC")
@@ -55,7 +63,7 @@ func TestStartStoresEverythingThenWaitReturnsMember(t *testing.T) {
 			f.h.Approve(p.Code, "Anna")
 		}
 	}
-	member, err := Wait(context.Background(), f.env, f.dir, f.store, p)
+	member, err := Wait(context.Background(), f.env, f.client(), f.dir, p)
 	if err != nil || member != "Anna" || f.polls != 3 {
 		t.Fatal(member, err, f.polls)
 	}
@@ -88,12 +96,20 @@ func TestWaitUnauthorizedIsExpiredAndTimeoutToo(t *testing.T) {
 	f := setup(t)
 	p, _ := Start(context.Background(), f.env, f.dir, f.store, f.h.URL, "pc")
 	f.onPoll = func(n int) { f.h.Remove(f.h.FirstDevice().ID) }
-	if _, err := Wait(context.Background(), f.env, f.dir, f.store, p); !errors.Is(err, ErrExpired) {
+	if _, err := Wait(context.Background(), f.env, f.client(), f.dir, p); !errors.Is(err, ErrExpired) {
 		t.Fatal(err)
+	}
+	// A declined or dead code must not be shown again: the next run starts a new link.
+	cfg, _ := f.dir.Load()
+	if cfg.Pending != nil {
+		t.Fatal("pending link kept after a 401")
+	}
+	if _, ok := Resume(cfg, f.h.URL, f.now); ok {
+		t.Fatal("dead code resumed")
 	}
 	f2 := setup(t)
 	p2, _ := Start(context.Background(), f2.env, f2.dir, f2.store, f2.h.URL, "pc")
-	if _, err := Wait(context.Background(), f2.env, f2.dir, f2.store, p2); !errors.Is(err, ErrExpired) {
+	if _, err := Wait(context.Background(), f2.env, f2.client(), f2.dir, p2); !errors.Is(err, ErrExpired) {
 		t.Fatal(err)
 	}
 }
@@ -110,7 +126,7 @@ func TestOtherAnswersAreAskedAgain(t *testing.T) {
 		}
 		return 0, "", false
 	}
-	member, err := Wait(context.Background(), f.env, f.dir, f.store, p)
+	member, err := Wait(context.Background(), f.env, f.client(), f.dir, p)
 	if err != nil || member != "Anna" || f.polls != 2 {
 		t.Fatal(member, err, f.polls)
 	}
@@ -132,5 +148,16 @@ func TestStartRefusals(t *testing.T) {
 	}
 	if cfg, _ := f.dir.Load(); cfg.Device != "" {
 		t.Fatal("config written for a failed start")
+	}
+}
+
+func TestDeviceNameCutToWhatTheHubKeeps(t *testing.T) {
+	f := setup(t)
+	if _, err := Start(context.Background(), f.env, f.dir, f.store, f.h.URL, "  "+strings.Repeat("ü", 60)); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _ := f.dir.Load()
+	if n := len([]rune(cfg.DeviceName)); n != wire.MaxDeviceName {
+		t.Fatalf("%d characters sent", n)
 	}
 }

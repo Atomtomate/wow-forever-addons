@@ -64,11 +64,10 @@ type Client struct {
 // NewHTTPClient returns a client that never follows a redirect: the path a request is signed
 // with must be the path the hub saw.
 func NewHTTPClient(timeout time.Duration) *http.Client {
-	return &http.Client{
-		Timeout:       timeout,
-		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-	}
+	return &http.Client{Timeout: timeout, CheckRedirect: noRedirect}
 }
+
+func noRedirect(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
 // ParseOrigin checks and normalises the hub's address: https, or http on a loopback host,
 // with no user, path, query or fragment.
@@ -118,7 +117,11 @@ func (c *Client) do(ctx context.Context, path string, body []byte, seq uint64) (
 		req.Header.Set("X-FF-Seq", strconv.FormatUint(seq, 10))
 		req.Header.Set("X-FF-Signature", Sign(c.Key, http.MethodPost, path, c.Device, seq, body))
 	}
-	resp, err := c.HTTP.Do(req)
+	// The redirect rule guards the signature (the signed path must be the path the hub saw), so
+	// it is enforced here on whatever client the caller passed in.
+	hc := *c.HTTP
+	hc.CheckRedirect = noRedirect
+	resp, err := hc.Do(req)
 	if err != nil {
 		return Result{}, err
 	}
@@ -223,7 +226,6 @@ func (c *Client) Sync(ctx context.Context, req wire.SyncRequest) (wire.SyncRespo
 		return out, res
 	}
 	var raw struct {
-		Member     string          `json:"member"`
 		RosterEtag string          `json:"roster_etag"`
 		Roster     json.RawMessage `json:"roster"`
 	}
@@ -231,7 +233,7 @@ func (c *Client) Sync(ctx context.Context, req wire.SyncRequest) (wire.SyncRespo
 		res.Outcome = Unreachable
 		return out, res
 	}
-	out = wire.SyncResponse{OK: true, Member: raw.Member, RosterEtag: raw.RosterEtag}
+	out = wire.SyncResponse{RosterEtag: raw.RosterEtag}
 	if len(raw.Roster) > 0 && string(raw.Roster) != "null" {
 		r, err := wire.ParseRoster(raw.Roster)
 		if err != nil {

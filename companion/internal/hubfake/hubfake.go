@@ -37,8 +37,6 @@ type Hub struct {
 	// Override, when it returns true, answers instead of the normal handler (after the request
 	// is counted).
 	Override func(path string) (status int, body string, ok bool)
-	// Interval is sent as "interval" on link; zero means 1.
-	Interval int
 	// Devices by id.
 	Devices map[string]*Device
 	// Syncs holds the decoded body of every sync that passed the signature checks.
@@ -176,11 +174,7 @@ func (h *Hub) link(w http.ResponseWriter, body []byte) {
 	id := "00000000000000" + strconv.Itoa(10+h.nextID)
 	code := "BCDF-" + string("GHJKLMNPQRSTVWXZ"[h.nextID%16]) + "BCD"
 	h.Devices[id] = &Device{ID: id, Key: key, Code: code}
-	iv := h.Interval
-	if iv == 0 {
-		iv = 1
-	}
-	reply(w, 200, `{"ok":true,"device":"`+id+`","user_code":"`+code+`","expires_in":600,"interval":`+strconv.Itoa(iv)+`}`)
+	reply(w, 200, `{"ok":true,"device":"`+id+`","user_code":"`+code+`","expires_in":600,"interval":1}`)
 }
 
 // verify runs the §3.2 checks in the contract's order and answers when one fails.

@@ -21,7 +21,6 @@ var (
 	procRegCreateKeyEx            = advapi32.NewProc("RegCreateKeyExW")
 	procRegOpenKeyEx              = advapi32.NewProc("RegOpenKeyExW")
 	procRegSetValueEx             = advapi32.NewProc("RegSetValueExW")
-	procRegQueryValueEx           = advapi32.NewProc("RegQueryValueExW")
 	procRegDeleteValue            = advapi32.NewProc("RegDeleteValueW")
 	procRegCloseKey               = advapi32.NewProc("RegCloseKey")
 	procShellExecute              = shell32.NewProc("ShellExecuteW")
@@ -31,13 +30,9 @@ const (
 	runKey            = `Software\Microsoft\Windows\CurrentVersion\Run`
 	runValue          = "ForeverFriendsCompanion"
 	hkeyCurrentUser   = 0x80000001
-	hkeyLocalMachine  = 0x80000002
 	keySetValue       = 0x0002
-	keyQueryValue     = 0x0001
-	keyWow6432        = 0x0200 // KEY_WOW64_32KEY: the 32-bit view the game's installer writes to
 	regSZ             = 1
 	processQueryLimit = 0x1000
-	errorFileNotFound = syscall.Errno(2)
 	// CreationFlags for a background process with no window of its own.
 	createNewProcessGroup = 0x00000200
 	detachedProcess       = 0x00000008
@@ -69,13 +64,9 @@ func ProgramDir() string {
 // CaseFoldPaths reports whether file paths ignore case.
 func CaseFoldPaths() bool { return true }
 
-// GameCandidates lists the usual install folders, and the one the Blizzard installer recorded
-// in the registry when that key exists (unverified: a failed lookup only means no hint).
+// GameCandidates lists the usual install folders; anything else, the member points to.
 func GameCandidates() []string {
 	var out []string
-	if p := regString(hkeyLocalMachine, `SOFTWARE\Blizzard Entertainment\World of Warcraft`, "InstallPath", keyWow6432); p != "" {
-		out = append(out, filepath.Join(p, "_forever_"), p)
-	}
 	for _, env := range []string{"ProgramFiles(x86)", "ProgramFiles"} {
 		if base := os.Getenv(env); base != "" {
 			out = append(out, filepath.Join(base, "World of Warcraft", "_forever_"))
@@ -85,23 +76,6 @@ func GameCandidates() []string {
 }
 
 func utf16(s string) *uint16 { p, _ := syscall.UTF16PtrFromString(s); return p }
-
-func regString(root uintptr, sub, name string, view uintptr) string {
-	var h syscall.Handle
-	r, _, _ := procRegOpenKeyEx.Call(root, uintptr(unsafe.Pointer(utf16(sub))), 0, keyQueryValue|view, uintptr(unsafe.Pointer(&h)))
-	if r != 0 {
-		return ""
-	}
-	defer procRegCloseKey.Call(uintptr(h))
-	buf := make([]uint16, 1024)
-	size := uint32(len(buf) * 2)
-	var typ uint32
-	r, _, _ = procRegQueryValueEx.Call(uintptr(h), uintptr(unsafe.Pointer(utf16(name))), 0, uintptr(unsafe.Pointer(&typ)), uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&size)))
-	if r != 0 || typ != regSZ {
-		return ""
-	}
-	return syscall.UTF16ToString(buf)
-}
 
 // ListImages returns the full executable path of every process it may open, through the
 // toolhelp snapshot and QueryFullProcessImageNameW: no child process, no PowerShell.
@@ -141,11 +115,9 @@ func imagePath(pid uint32) string {
 	return syscall.UTF16ToString(buf[:size])
 }
 
-// OpenURL opens an http(s) address with the shell, as a double-click on a link would.
+// OpenURL opens an address with the shell, as a double-click on a link would; the caller builds
+// it from a checked origin.
 func OpenURL(url string) error {
-	if len(url) < 7 || (url[:7] != "http://" && (len(url) < 8 || url[:8] != "https://")) {
-		return errors.New("not a web address")
-	}
 	r, _, _ := procShellExecute.Call(0, uintptr(unsafe.Pointer(utf16("open"))), uintptr(unsafe.Pointer(utf16(url))), 0, 0, swShowNormal)
 	if r <= 32 {
 		return errors.New("the browser could not be opened")
@@ -153,15 +125,20 @@ func OpenURL(url string) error {
 	return nil
 }
 
-// SetAutostart registers `"exe" run` under HKCU Run, which starts it at this user's logon.
-func SetAutostart(exe string) error {
+// SetAutostart registers `"exe" run args...` under HKCU Run, which starts it at this user's
+// logon. Each argument is quoted, so a config folder with a space survives.
+func SetAutostart(exe string, args ...string) error {
 	var h syscall.Handle
 	r, _, _ := procRegCreateKeyEx.Call(hkeyCurrentUser, uintptr(unsafe.Pointer(utf16(runKey))), 0, 0, 0, keySetValue, 0, uintptr(unsafe.Pointer(&h)), 0)
 	if r != 0 {
 		return syscall.Errno(r)
 	}
 	defer procRegCloseKey.Call(uintptr(h))
-	data, _ := syscall.UTF16FromString(`"` + exe + `" run`)
+	line := `"` + exe + `" run`
+	for _, a := range args {
+		line += ` "` + a + `"`
+	}
+	data, _ := syscall.UTF16FromString(line)
 	r, _, _ = procRegSetValueEx.Call(uintptr(h), uintptr(unsafe.Pointer(utf16(runValue))), 0, regSZ, uintptr(unsafe.Pointer(&data[0])), uintptr(len(data)*2))
 	if r != 0 {
 		return syscall.Errno(r)
@@ -178,7 +155,7 @@ func RemoveAutostart() error {
 	}
 	defer procRegCloseKey.Call(uintptr(h))
 	r, _, _ = procRegDeleteValue.Call(uintptr(h), uintptr(unsafe.Pointer(utf16(runValue))))
-	if r != 0 && syscall.Errno(r) != errorFileNotFound {
+	if r != 0 && syscall.Errno(r) != syscall.ERROR_FILE_NOT_FOUND {
 		return syscall.Errno(r)
 	}
 	return nil

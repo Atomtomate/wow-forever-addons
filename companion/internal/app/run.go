@@ -58,13 +58,11 @@ func (c *cmdCtx) run(ctx context.Context, args []string) int {
 		fmt.Fprintln(c.env.Stdout, "sync: unlinked (this PC is no longer linked; run setup)")
 		return mapExit(*once, ExitUnlinked)
 	}
-	key, err := dir.LoadKey()
-	hub, herr := hubapi.ParseOrigin(cfg.Hub)
-	if err != nil || herr != nil {
-		log.Printf("link unusable: key %v, address %v", err, herr)
+	client, err := c.client(dir, cfg, store)
+	if err != nil {
+		log.Printf("link unusable: %v", err)
 		return ExitFailed
 	}
-	client := &hubapi.Client{Origin: hub, Device: cfg.Device, Key: key, Seq: store, HTTP: c.env.HTTP, UserAgent: c.userAgent()}
 	dataDir := filepath.Join(cfg.Game, "Interface", "AddOns", dataaddon.FolderName)
 	s := syncer.New(syncer.Deps{
 		Hub: client,
@@ -73,14 +71,11 @@ func (c *cmdCtx) run(ctx context.Context, args []string) int {
 			images, _ := c.env.P.ListImages()
 			return gamefind.Running(images, cfg.Game, c.env.P.CaseFold)
 		},
-		Read:             func() savedvars.Snapshot { return savedvars.Read(os.DirFS(cfg.Game)) },
-		Store:            store,
-		RosterFileExists: func() bool { _, err := os.Stat(filepath.Join(dataDir, "Data.lua")); return err == nil },
-		WriteRoster: func(r wire.Roster, now time.Time) error {
-			_, err := dataaddon.Write(dataDir, r, c.iface, now)
-			return err
-		},
-		Log: log.Printf,
+		Read:        func() savedvars.Snapshot { return savedvars.Read(os.DirFS(cfg.Game)) },
+		Store:       store,
+		RosterHash:  func() string { return dataaddon.Hash(dataDir) },
+		WriteRoster: func(r wire.Roster, now time.Time) error { return dataaddon.Write(dataDir, r, c.iface, now) },
+		Log:         log.Printf,
 	})
 	if *once {
 		s.Tick(ctx)
@@ -88,7 +83,7 @@ func (c *cmdCtx) run(ctx context.Context, args []string) int {
 	}
 	log.Printf("companion %s started", c.version)
 	err = s.Run(ctx, c.env.Sleep, func() bool { return instance.StopRequested(dir.Path(config.StopFile)) })
-	log.Printf("companion stopped (status %d, %v)", s.Status(), err)
+	log.Printf("companion stopped (unlinked: %v, %v)", s.Revoked(), err)
 	return ExitOK
 }
 
@@ -101,7 +96,7 @@ func mapExit(once bool, code int) int {
 
 func (c *cmdCtx) onceResult(s *syncer.Syncer) int {
 	out := c.env.Stdout
-	if s.Status() == syncer.Revoked {
+	if s.Revoked() {
 		fmt.Fprintln(out, "sync: unlinked")
 		return ExitUnlinked
 	}

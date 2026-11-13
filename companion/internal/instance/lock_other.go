@@ -1,4 +1,4 @@
-//go:build unix
+//go:build !windows
 
 package instance
 
@@ -23,6 +23,3 @@ func TryAcquire(path string) (*Lock, error) {
 	}
 	return &Lock{f: f}, nil
 }
-
-// Release gives the lock up.
-func (l *Lock) Release() { _ = l.f.Close() }

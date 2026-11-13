@@ -17,6 +17,8 @@ const (
 	MaxBodyBytes   = 128 << 10
 	MaxMemberName  = 160
 	MaxMemberChars = 60
+	// MaxDeviceName is the length of a PC's name the hub keeps, in characters.
+	MaxDeviceName = 40
 	// MaxAnswerBytes bounds what the companion reads of any answer; a member list for fifteen
 	// people is a few KiB, so this only stops a runaway server.
 	MaxAnswerBytes = 4 << 20
@@ -72,7 +74,6 @@ type LinkRequest struct {
 
 // LinkResponse answers LinkRequest.
 type LinkResponse struct {
-	OK        bool   `json:"ok"`
 	Device    string `json:"device"`
 	UserCode  string `json:"user_code"`
 	ExpiresIn int    `json:"expires_in"`
@@ -81,7 +82,6 @@ type LinkResponse struct {
 
 // StatusResponse answers link/status.
 type StatusResponse struct {
-	OK     bool   `json:"ok"`
 	Linked bool   `json:"linked"`
 	Member string `json:"member"`
 }
@@ -105,10 +105,9 @@ type Roster struct {
 	Members []RosterMember
 }
 
-// SyncResponse is the 200 answer of sync, with the roster already checked by ParseRoster.
+// SyncResponse is the part of the 200 answer of sync the companion uses, with the member list
+// already checked by ParseRoster.
 type SyncResponse struct {
-	OK         bool
-	Member     string
 	RosterEtag string
 	Roster     *Roster
 }

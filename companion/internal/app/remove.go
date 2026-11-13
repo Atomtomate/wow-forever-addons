@@ -5,12 +5,14 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Atomtomate/wow-forever-addons/companion/internal/applog"
 	"github.com/Atomtomate/wow-forever-addons/companion/internal/config"
 	"github.com/Atomtomate/wow-forever-addons/companion/internal/dataaddon"
 	"github.com/Atomtomate/wow-forever-addons/companion/internal/gamefind"
 	"github.com/Atomtomate/wow-forever-addons/companion/internal/hubapi"
 	"github.com/Atomtomate/wow-forever-addons/companion/internal/install"
 	"github.com/Atomtomate/wow-forever-addons/companion/internal/instance"
+	"github.com/Atomtomate/wow-forever-addons/companion/internal/savedvars"
 )
 
 func (c *cmdCtx) status(args []string) int {
@@ -42,6 +44,13 @@ func (c *cmdCtx) status(args []string) int {
 	u.say("Game folder: %s", cfg.Game)
 	images, _ := c.env.P.ListImages()
 	u.say("Game running now: %v", gamefind.Running(images, cfg.Game, c.env.P.CaseFold))
+	snap := savedvars.Read(os.DirFS(cfg.Game))
+	u.say("Characters in the addon's file: %d (in %d file(s))", len(snap.Characters), len(snap.Files))
+	for _, f := range snap.Files {
+		if !f.OK {
+			u.say("Cannot use %s: %s", f.Path, f.Problem)
+		}
+	}
 	if l, err := instance.TryAcquire(dir.Path(config.LockFile)); err == nil {
 		l.Release()
 		u.say("The companion is not running in the background.")
@@ -66,11 +75,20 @@ func (c *cmdCtx) remove(ctx context.Context, args []string) int {
 	return c.removeWith(ctx, dir, false)
 }
 
+// unlinkResult is what asking the hub to forget this PC came to.
+type unlinkResult int
+
+const (
+	unlinked    unlinkResult = iota // the hub forgot it, or already had
+	notLinked                       // this PC never registered, so there is nothing to undo
+	unlinkFails                     // the hub could not be asked (unreachable, or the key is unreadable)
+)
+
 // removeWith unlinks this PC and takes away what the companion put on it. asked is true when
 // the member has just typed "remove" and need not be asked again.
 func (c *cmdCtx) removeWith(ctx context.Context, dir config.Dir, asked bool) int {
 	u := c.ui
-	if !asked && !u.confirm("This unlinks this PC, removes the addon folders ForeverFriends and ForeverFriendsData and the companion's own files. Continue?", false) {
+	if !asked && !u.confirm("This unlinks this PC and removes the addon folders ForeverFriends and ForeverFriendsData and the companion's own files. Continue?", false) {
 		return ExitOK
 	}
 	cfg, _ := dir.Load()
@@ -79,8 +97,10 @@ func (c *cmdCtx) removeWith(ctx context.Context, dir config.Dir, asked bool) int
 		u.say("%v", err)
 		return ExitFailed
 	}
-	if cfg.Device != "" {
-		if !c.unlink(ctx, dir, cfg) && !(u.yes || u.confirmRisky("The site could not be reached, so this PC stays listed on your profile until you remove it there. Continue anyway?", false)) {
+	result := c.unlink(ctx, dir, cfg)
+	if result == unlinkFails {
+		u.say("The site could not be asked to forget this PC.")
+		if !(u.yes || u.confirmRisky("It stays listed on your profile until you remove it there. Continue anyway?", false)) {
 			lock.Release()
 			return ExitFailed
 		}
@@ -89,34 +109,44 @@ func (c *cmdCtx) removeWith(ctx context.Context, dir config.Dir, asked bool) int
 		u.say("Could not remove the start with Windows: %v", err)
 	}
 	if cfg.Game != "" {
-		for _, line := range install.Remove(filepath.Join(cfg.Game, "Interface", "AddOns"), install.AddonName, dataaddon.FolderName) {
+		for _, line := range install.Remove(filepath.Join(cfg.Game, "Interface", "AddOns"), c.env.P.CaseFold, install.AddonName, dataaddon.FolderName) {
 			u.say("%s", line)
 		}
 	}
 	lock.Release()
-	for _, name := range []string{config.ConfigFile, config.StateFile, config.KeyFile, config.LogFile, config.LogFile + ".1", config.StopFile, config.LockFile} {
-		_ = os.Remove(dir.Path(name))
+	for _, name := range append(applog.Files(dir.Path(config.LogFile)), dir.Path(config.ConfigFile), dir.Path(config.StateFile), dir.Path(config.KeyFile), dir.Path(config.StopFile), dir.Path(config.LockFile)) {
+		_ = os.Remove(name)
 	}
 	_ = os.Remove(string(dir)) // only if empty
 	c.removeProgram()
-	u.say("Removed. The site no longer lists this PC.")
+	if result == unlinkFails {
+		u.say("Removed from this PC. The site may still list it: remove it on your profile.")
+	} else {
+		u.say("Removed. The site no longer lists this PC.")
+	}
+	u.say("What stays: your characters on the site (delete them on your profile if you want them gone) and the game's own file")
+	u.say("WTF/Account/<account>/SavedVariables/ForeverFriends.lua, which the companion never touches.")
 	return ExitOK
 }
 
 // unlink asks the hub to forget this device; a 401 means it already has.
-func (c *cmdCtx) unlink(ctx context.Context, dir config.Dir, cfg config.Config) bool {
-	key, err := dir.LoadKey()
-	store, serr := dir.OpenStore()
-	hub, herr := hubapi.ParseOrigin(cfg.Hub)
-	if err != nil || serr != nil || herr != nil {
-		return true // nothing was ever registered that could be undone from here
+func (c *cmdCtx) unlink(ctx context.Context, dir config.Dir, cfg config.Config) unlinkResult {
+	if cfg.Device == "" {
+		return notLinked
 	}
-	cl := &hubapi.Client{Origin: hub, Device: cfg.Device, Key: key, Seq: store, HTTP: c.env.HTTP, UserAgent: c.userAgent()}
-	switch cl.Unlink(ctx).Outcome {
+	store, err := dir.OpenStore()
+	if err != nil {
+		return unlinkFails
+	}
+	client, err := c.client(dir, cfg, store)
+	if err != nil {
+		return unlinkFails
+	}
+	switch client.Unlink(ctx).Outcome {
 	case hubapi.OK, hubapi.Unlinked:
-		return true
+		return unlinked
 	}
-	return false
+	return unlinkFails
 }
 
 func (c *cmdCtx) removeProgram() {

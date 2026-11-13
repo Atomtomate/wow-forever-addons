@@ -14,6 +14,9 @@ var ErrHeld = errors.New("the companion is already running")
 // dies, so there is no stale lock to clean up.
 type Lock struct{ f *os.File }
 
+// Release gives the lock up.
+func (l *Lock) Release() { _ = l.f.Close() }
+
 // RequestStop asks a running companion to exit at its next tick.
 func RequestStop(stopFile string) error { return os.WriteFile(stopFile, []byte("stop\n"), 0o600) }
 

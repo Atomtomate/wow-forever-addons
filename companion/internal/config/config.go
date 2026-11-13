@@ -8,9 +8,13 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
+
+	"github.com/Atomtomate/wow-forever-addons/companion/internal/atomicfile"
 )
 
 // File names inside the folder.
@@ -36,6 +40,20 @@ type Pending struct {
 	IntervalSec int    `json:"interval"`
 }
 
+// defaultInterval is how often to ask when the hub named none.
+const defaultInterval = 5 * time.Second
+
+// Expires is when the hub forgets the link.
+func (p Pending) Expires() time.Time { return time.Unix(p.ExpiresUnix, 0) }
+
+// Interval is how often to ask whether the member has approved.
+func (p Pending) Interval() time.Duration {
+	if p.IntervalSec <= 0 {
+		return defaultInterval
+	}
+	return time.Duration(p.IntervalSec) * time.Second
+}
+
 // Config is the link between this PC and a hub.
 type Config struct {
 	V          int      `json:"v"`
@@ -53,27 +71,10 @@ type State struct {
 	Seq        uint64            `json:"seq"`
 	Uploaded   map[string]string `json:"uploaded,omitempty"`
 	RosterEtag string            `json:"roster_etag,omitempty"`
-	Revoked    bool              `json:"revoked,omitempty"`
-}
-
-// WriteFileAtomic writes beside the file and renames over it, so a reader never sees half.
-func WriteFileAtomic(path string, data []byte, mode os.FileMode) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
-	tmp := path + ".tmp"
-	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
-	if err != nil {
-		return err
-	}
-	_, werr := f.Write(data)
-	serr := f.Sync()
-	cerr := f.Close()
-	if err := errors.Join(werr, serr, cerr); err != nil {
-		_ = os.Remove(tmp)
-		return err
-	}
-	return os.Rename(tmp, path)
+	// RosterHash is the hash of the Data.lua the companion wrote when it stored RosterEtag; the
+	// etag is sent only while the file still has it.
+	RosterHash string `json:"roster_hash,omitempty"`
+	Revoked    bool   `json:"revoked,omitempty"`
 }
 
 func readJSON(path string, v any) error {
@@ -92,7 +93,7 @@ func writeJSON(path string, v any) error {
 	if err != nil {
 		return err
 	}
-	return WriteFileAtomic(path, b, 0o600)
+	return atomicfile.Write(path, b, 0o700, 0o600)
 }
 
 // Load reads config.json; a missing file is an empty Config.
@@ -111,7 +112,7 @@ func (d Dir) SaveKey(k ed25519.PrivateKey) error {
 	if err != nil {
 		return err
 	}
-	return WriteFileAtomic(d.Path(KeyFile), pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}), 0o600)
+	return atomicfile.Write(d.Path(KeyFile), pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}), 0o700, 0o600)
 }
 
 // LoadKey reads the private key.
@@ -157,9 +158,9 @@ func (s *Store) Snapshot() State {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	c := s.s
-	c.Uploaded = make(map[string]string, len(s.s.Uploaded))
-	for k, v := range s.s.Uploaded {
-		c.Uploaded[k] = v
+	c.Uploaded = maps.Clone(s.s.Uploaded)
+	if c.Uploaded == nil {
+		c.Uploaded = map[string]string{}
 	}
 	return c
 }

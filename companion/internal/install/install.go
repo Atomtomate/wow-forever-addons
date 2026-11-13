@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Atomtomate/wow-forever-addons/companion/internal/config"
+	"github.com/Atomtomate/wow-forever-addons/companion/internal/atomicfile"
 )
 
 // AddonName is the folder, and the .toc, this package installs.
@@ -103,7 +103,8 @@ func leadingInt(s string) int {
 
 // IsLink reports whether p is a symlink or a Windows junction, or lies behind one. Go 1.23
 // reports a junction as ModeIrregular; the second test catches whatever the mode misses.
-func IsLink(p string) bool {
+// foldCase is the platform's answer to whether paths ignore case.
+func IsLink(p string, foldCase bool) bool {
 	st, err := os.Lstat(p)
 	if err != nil {
 		return false
@@ -116,7 +117,11 @@ func IsLink(p string) bool {
 		return false
 	}
 	real, err := filepath.EvalSymlinks(p)
-	return err == nil && !strings.EqualFold(real, filepath.Join(realParent, filepath.Base(p)))
+	want := filepath.Join(realParent, filepath.Base(p))
+	if foldCase {
+		return err == nil && !strings.EqualFold(real, want)
+	}
+	return err == nil && real != want
 }
 
 // What Install did.
@@ -142,14 +147,14 @@ type Report struct {
 // Install copies the addon in src (the embedded files, rooted at the addon folder) to
 // addonsDir/ForeverFriends. confirm is asked before replacing a folder that is not ours; nil
 // means no.
-func Install(src fs.FS, addonsDir string, confirm func(question string) bool) (Report, error) {
+func Install(src fs.FS, addonsDir string, foldCase bool, confirm func(question string) bool) (Report, error) {
 	toc, err := ReadToc(src)
 	if err != nil {
 		return Report{}, err
 	}
 	dest := filepath.Join(addonsDir, AddonName)
 	rep := Report{Version: toc.Version}
-	if IsLink(dest) {
+	if IsLink(dest, foldCase) {
 		rep.Action = LeftLinked
 		return rep, nil
 	}
@@ -161,6 +166,9 @@ func Install(src fs.FS, addonsDir string, confirm func(question string) bool) (R
 		return rep, err
 	default:
 		old, terr := os.ReadFile(filepath.Join(dest, AddonName+".toc"))
+		if terr != nil && onlyOurs(entries, toc) {
+			break // an interrupted first install: finish it
+		}
 		if terr != nil {
 			if confirm == nil {
 				return rep, ErrForeign
@@ -198,6 +206,21 @@ func Install(src fs.FS, addonsDir string, confirm func(question string) bool) (R
 	return rep, nil
 }
 
+// onlyOurs reports whether every entry of a folder without a .toc is a file the embedded .toc
+// lists, or the temporary file of one: what an interrupted first install leaves behind.
+func onlyOurs(entries []os.DirEntry, toc Toc) bool {
+	listed := map[string]bool{}
+	for _, f := range toc.Files {
+		listed[path.Base(f)], listed[path.Base(f)+".tmp"] = true, true
+	}
+	for _, e := range entries {
+		if e.IsDir() || !listed[e.Name()] {
+			return false
+		}
+	}
+	return true
+}
+
 // copyFiles writes every listed file whose bytes differ, the .toc last so that a half-finished
 // copy still shows the old version and is repaired by the next run, then removes the .lua,
 // .toc and .xml files the new version no longer lists.
@@ -216,7 +239,7 @@ func copyFiles(src fs.FS, dest string, toc Toc) (bool, error) {
 		if have, err := os.ReadFile(target); err == nil && bytes.Equal(have, want) {
 			continue
 		}
-		if err := config.WriteFileAtomic(target, want, 0o644); err != nil {
+		if err := atomicfile.Write(target, want, 0o755, 0o644); err != nil {
 			return changed, err
 		}
 		changed = true
@@ -237,7 +260,7 @@ func copyFiles(src fs.FS, dest string, toc Toc) (bool, error) {
 
 // Remove deletes the named addon folders inside addonsDir, except one that is a link. It
 // returns a line for each folder it looked at.
-func Remove(addonsDir string, names ...string) []string {
+func Remove(addonsDir string, foldCase bool, names ...string) []string {
 	var out []string
 	for _, n := range names {
 		if n == "" || n == "." || n == ".." || n != filepath.Base(n) {
@@ -246,7 +269,7 @@ func Remove(addonsDir string, names ...string) []string {
 		p := filepath.Join(addonsDir, n)
 		switch _, err := os.Lstat(p); {
 		case err != nil:
-		case IsLink(p):
+		case IsLink(p, foldCase):
 			out = append(out, n+": left alone, it is a link")
 		default:
 			if err := os.RemoveAll(p); err != nil {

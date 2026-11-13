@@ -9,6 +9,10 @@ import (
 	"github.com/Atomtomate/wow-forever-addons/companion/internal/wire"
 )
 
+// FormatVersion is the version of the §1 file this reader knows; the sync body's version is
+// another number (wire.Version) and the two change separately.
+const FormatVersion = 1
+
 // FilePattern finds one file per WoW account, relative to the game folder.
 const FilePattern = "WTF/Account/*/SavedVariables/ForeverFriends.lua"
 
@@ -110,8 +114,8 @@ func characters(top map[string]Value) (map[string]wire.Character, error) {
 	if !ok {
 		return nil, fmt.Errorf("no ForeverFriendsDB table")
 	}
-	if v, ok := asInt(db.Get("version")); !ok || v != wire.Version {
-		return nil, fmt.Errorf("unknown format version, this companion reads %d", wire.Version)
+	if v, ok := asInt(db.Get("version")); !ok || v != FormatVersion {
+		return nil, fmt.Errorf("unknown format version, this companion reads %d", FormatVersion)
 	}
 	out := map[string]wire.Character{}
 	chars, ok := db.Get("characters").(*Table)

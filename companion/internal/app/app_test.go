@@ -22,21 +22,22 @@ const svFile = `ForeverFriendsDB = { version = 1, characters = {
    skills = { { id = 171, name = "Alchimie", rank = 145, max = 150 } }, seen = 1763000000 } } }`
 
 type rig struct {
-	t         *testing.T
-	h         *hubfake.Hub
-	cfg       string
-	game      string
-	prog      string
-	exe       string
-	env       Env
-	out       *bytes.Buffer
-	now       time.Time
-	images    []string
-	spawned   [][]string
-	opened    []string
-	approve   bool
-	onSleep   func()
-	autostart string
+	t             *testing.T
+	h             *hubfake.Hub
+	cfg           string
+	game          string
+	prog          string
+	exe           string
+	env           Env
+	out           *bytes.Buffer
+	now           time.Time
+	images        []string
+	spawned       [][]string
+	opened        []string
+	approve       bool
+	onSleep       func()
+	autostart     string
+	autostartArgs []string
 }
 
 func addon() fs.FS {
@@ -82,11 +83,10 @@ func newRig(t *testing.T) *rig {
 		P: Platform{
 			ProgramDir:      func() string { return r.prog },
 			Executable:      func() (string, error) { return r.exe, nil },
-			QueryVersion:    func(string) string { return "" },
 			GameCandidates:  func() []string { return nil },
 			ListImages:      func() ([]string, error) { return r.images, nil },
 			OpenURL:         func(u string) error { r.opened = append(r.opened, u); return nil },
-			SetAutostart:    func(e string) error { r.autostart = e; return nil },
+			SetAutostart:    func(e string, a ...string) error { r.autostart, r.autostartArgs = e, a; return nil },
 			RemoveAutostart: func() error { r.autostart = ""; return nil },
 			SpawnDetached: func(e string, a ...string) error {
 				r.spawned = append(r.spawned, append([]string{e}, a...))
@@ -198,23 +198,6 @@ func TestSetupResumesPendingLinkWithoutNewStart(t *testing.T) {
 	}
 }
 
-func TestSetupAsksBeforeNewLinkAfterExpiry(t *testing.T) {
-	r := newRig(t)
-	r.approve = false
-	r.env.Sleep = func(ctx context.Context, d time.Duration) error { r.now = r.now.Add(d); return nil }
-	if code := r.main(r.setupArgs()...); code != ExitNotLinked { // runs out the clock
-		t.Fatalf("%d\n%s", code, r.out)
-	}
-	r.env.Stdin = strings.NewReader("n\n")
-	args := []string{"setup", "--hub", r.h.URL, "--game", r.game, "--config-dir", r.cfg, "--no-browser", "--no-autostart", "--no-self-copy"}
-	if code := r.main(args...); code != ExitOK || r.h.Count("/api/companion/link") != 1 {
-		t.Fatalf("%d, %d starts\n%s", code, r.h.Count("/api/companion/link"), r.out)
-	}
-	if !strings.Contains(r.out.String(), "expired") {
-		t.Fatal(r.out)
-	}
-}
-
 func TestRemoveCallsUnlinkThenDeletes(t *testing.T) {
 	r := newRig(t)
 	r.main(r.setupArgs()...)
@@ -311,15 +294,150 @@ func TestSetupCannotStopRunningInstanceReplacesNothing(t *testing.T) {
 	}
 }
 
-func TestSetupNewerInstalledCopyIsNotDowngradedWithYes(t *testing.T) {
+// A download older than what is installed replaces neither the addon nor the program copy, says
+// so in one line, and goes on.
+func TestOlderDownloadReplacesNeitherAddonNorProgram(t *testing.T) {
 	r := newRig(t)
+	r.main(r.setupArgs()...)
+	cfgBefore, _ := os.ReadFile(filepath.Join(r.cfg, config.ConfigFile))
 	_ = os.MkdirAll(r.prog, 0o755)
-	_ = os.WriteFile(filepath.Join(r.prog, programFile), []byte("newer"), 0o755)
-	r.env.P.QueryVersion = func(string) string { return "9.0.0" }
+	_ = os.WriteFile(filepath.Join(r.prog, programFile), []byte("newer program"), 0o755)
+	tocPath := filepath.Join(r.addons(), "ForeverFriends", "ForeverFriends.toc")
+	_ = os.WriteFile(tocPath, []byte("## Interface: 16001\n## Version: 9.0.0\nCore.lua\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(r.addons(), "ForeverFriends", "Core.lua"), []byte("newer addon"), 0o644)
+	args := []string{"setup", "--yes", "--config-dir", r.cfg, "--no-browser", "--no-autostart"}
+	if code := r.main(args...); code != ExitOK {
+		t.Fatalf("%d\n%s", code, r.out)
+	}
+	if b, _ := os.ReadFile(filepath.Join(r.prog, programFile)); string(b) != "newer program" {
+		t.Fatal("program copy replaced by an older download")
+	}
+	if b, _ := os.ReadFile(filepath.Join(r.addons(), "ForeverFriends", "Core.lua")); string(b) != "newer addon" {
+		t.Fatal("addon replaced by an older download")
+	}
+	if !strings.Contains(r.out.String(), "older than the installed version (9.0.0)") {
+		t.Fatal(r.out)
+	}
+	if len(r.spawned) == 0 {
+		t.Fatal("the background copy was not started")
+	}
+	after, _ := os.ReadFile(filepath.Join(r.cfg, config.ConfigFile))
+	if string(after) != string(cfgBefore) {
+		t.Fatal("the link changed")
+	}
+}
+
+func TestDecliningANewLinkStopsSetup(t *testing.T) {
+	r := newRig(t)
+	r.approve = false
+	r.env.Sleep = func(ctx context.Context, d time.Duration) error { r.now = r.now.Add(d); return nil }
+	// a link started and left open, then the window closed: pending and not yet expired, then late
+	ctx, cancel := context.WithCancel(context.Background())
+	r.env.Sleep = func(c context.Context, d time.Duration) error { cancel(); return c.Err() }
+	Main(ctx, r.setupArgs(), r.env)
+	r.now = r.now.Add(time.Hour)
+	r.env.Sleep = func(ctx context.Context, d time.Duration) error { r.now = r.now.Add(d); return nil }
+	r.env.Stdin = strings.NewReader("n\n")
+	args := []string{"setup", "--hub", r.h.URL, "--game", r.game, "--config-dir", r.cfg, "--no-browser", "--no-autostart"}
+	if code := r.main(args...); code != ExitOK {
+		t.Fatalf("%d\n%s", code, r.out)
+	}
+	if len(r.spawned) != 0 || r.autostart != "" {
+		t.Fatal("started or registered an unlinked PC")
+	}
+	if _, err := os.Stat(filepath.Join(r.addons(), "ForeverFriends")); err == nil {
+		t.Fatal("installed the addon after the member declined")
+	}
+}
+
+func TestDeclinedCodeIsNotShownAgain(t *testing.T) {
+	r := newRig(t)
+	r.approve = false
+	r.onSleep = func() {
+		if d := r.h.FirstDevice(); d != nil {
+			r.h.Remove(d.ID) // the member pressed Decline
+		}
+	}
+	if code := r.main(r.setupArgs()...); code != ExitNotLinked {
+		t.Fatalf("%d\n%s", code, r.out)
+	}
+	first := r.h.Count("/api/companion/link")
+	r.onSleep, r.approve = nil, true
+	if code := r.main(r.setupArgs()...); code != ExitOK || r.h.Count("/api/companion/link") != first+1 {
+		t.Fatalf("%d, %d starts\n%s", code, r.h.Count("/api/companion/link"), r.out)
+	}
+}
+
+func TestAutostartKeepsTheConfigFolder(t *testing.T) {
+	r := newRig(t)
 	args := []string{"setup", "--yes", "--hub", r.h.URL, "--game", r.game, "--config-dir", r.cfg, "--no-browser"}
 	r.main(args...)
-	if b, _ := os.ReadFile(filepath.Join(r.prog, programFile)); string(b) != "newer" {
-		t.Fatal("downgraded without asking")
+	if len(r.autostartArgs) != 2 || r.autostartArgs[0] != "--config-dir" || r.autostartArgs[1] != r.cfg {
+		t.Fatalf("%v", r.autostartArgs)
+	}
+}
+
+func TestChangingTheGameFolderStillFillsTheNewMemberList(t *testing.T) {
+	r := newRig(t)
+	r.main(r.setupArgs()...)
+	r.main("run", "--once", "--config-dir", r.cfg) // the hub's list is written, its etag stored
+	other := filepath.Join(filepath.Dir(r.game), "other", "_forever_")
+	_ = os.MkdirAll(filepath.Join(other, "Interface", "AddOns"), 0o755)
+	if code := r.main("setup", "--yes", "--game", other, "--config-dir", r.cfg, "--no-browser", "--no-autostart", "--no-self-copy"); code != ExitOK {
+		t.Fatalf("%d\n%s", code, r.out)
+	}
+	r.main("run", "--once", "--config-dir", r.cfg)
+	data, _ := os.ReadFile(filepath.Join(other, "Interface", "AddOns", "ForeverFriendsData", "Data.lua"))
+	if !strings.Contains(string(data), `name = "Anna"`) {
+		t.Fatalf("the new game folder's list stayed empty:\n%s", data)
+	}
+}
+
+func TestRemoveSaysWhatHappenedAndWhatStays(t *testing.T) {
+	r := newRig(t)
+	r.main(r.setupArgs()...)
+	r.h.Override = func(string) (int, string, bool) { return 503, ``, true }
+	r.main("remove", "--yes", "--config-dir", r.cfg)
+	out := r.out.String()
+	if strings.Contains(out, "The site no longer lists this PC") || !strings.Contains(out, "may still list it") {
+		t.Fatalf("claims success after a failed unlink:\n%s", out)
+	}
+	for _, want := range []string{"your characters on the site", "ForeverFriends.lua"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("does not say that %q stays:\n%s", want, out)
+		}
+	}
+	r2 := newRig(t)
+	r2.main(r2.setupArgs()...)
+	r2.main("remove", "--yes", "--config-dir", r2.cfg)
+	if !strings.Contains(r2.out.String(), "The site no longer lists this PC") {
+		t.Fatal(r2.out)
+	}
+}
+
+func TestStatusShowsCharactersAndAnUnreadableFile(t *testing.T) {
+	r := newRig(t)
+	r.main(r.setupArgs()...)
+	r.main("status", "--config-dir", r.cfg)
+	if !strings.Contains(r.out.String(), "Characters in the addon's file: 1") {
+		t.Fatal(r.out)
+	}
+	_ = os.WriteFile(filepath.Join(r.game, "WTF", "Account", "ACC", "SavedVariables", "ForeverFriends.lua"), []byte("ForeverFriendsDB = { "), 0o644)
+	r.main("status", "--config-dir", r.cfg)
+	if !strings.Contains(r.out.String(), "Cannot use WTF/Account/ACC/SavedVariables/ForeverFriends.lua") {
+		t.Fatal(r.out)
+	}
+}
+
+func TestSetupSaysNothingChangesOnlyOnAFirstRun(t *testing.T) {
+	r := newRig(t)
+	r.main(r.setupArgs()...)
+	if !strings.Contains(r.out.String(), "Nothing changes until you answer.") || !strings.Contains(r.out.String(), "looks at which") {
+		t.Fatal(r.out)
+	}
+	r.main(r.setupArgs()...)
+	if strings.Contains(r.out.String(), "Nothing changes until you answer.") || !strings.Contains(r.out.String(), "updates the addon") {
+		t.Fatal(r.out)
 	}
 }
 
@@ -334,7 +452,8 @@ func TestNothingWrittenOutsideTheTwoAddonFolders(t *testing.T) {
 			continue
 		}
 		rel, _ := filepath.Rel(r.game, p)
-		if !strings.HasPrefix(rel, filepath.Join("Interface", "AddOns", "ForeverFriends")) {
+		seg := strings.Split(filepath.ToSlash(rel), "/")
+		if len(seg) < 4 || seg[0] != "Interface" || seg[1] != "AddOns" || (seg[2] != "ForeverFriends" && seg[2] != "ForeverFriendsData") {
 			t.Errorf("wrote or changed %s", rel)
 		}
 	}
@@ -367,15 +486,6 @@ func TestGameFolderPromptAndBadFlag(t *testing.T) {
 	}
 	if !strings.Contains(r2.out.String(), "found "+r2.game) {
 		t.Fatal(r2.out)
-	}
-}
-
-func TestDeviceNameCleaned(t *testing.T) {
-	if got := cleanDeviceName("  PC\x00​" + strings.Repeat("x", 60)); len([]rune(got)) != 40 || strings.ContainsAny(got, "\x00​") {
-		t.Fatalf("%q", got)
-	}
-	if cleanDeviceName("\x01 ") != "PC" {
-		t.Fatal("empty name not replaced")
 	}
 }
 

@@ -54,9 +54,9 @@ func TestVersionCompare(t *testing.T) {
 	}
 }
 
-func TestFreshInstallTocLast(t *testing.T) {
+func TestFreshInstall(t *testing.T) {
 	dir := t.TempDir()
-	rep, err := Install(addon("0.1.0", map[string]string{"Core.lua": "a", "Pack.lua": "b"}), dir, nil)
+	rep, err := Install(addon("0.1.0", map[string]string{"Core.lua": "a", "Pack.lua": "b"}), dir, false, nil)
 	if err != nil || rep.Action != Installed || rep.Version != "0.1.0" {
 		t.Fatal(rep, err)
 	}
@@ -71,11 +71,40 @@ func TestFreshInstallTocLast(t *testing.T) {
 	}
 }
 
+// The .toc is written last: an update that fails part way still shows the old version, so the
+// next run repairs it instead of believing it is current.
+func TestTocWrittenLastSoAFailedUpdateKeepsOldVersion(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := Install(addon("0.1.0", map[string]string{"Core.lua": "old"}), dir, false, nil); err != nil {
+		t.Fatal(err)
+	}
+	next := addon("0.2.0", map[string]string{"Core.lua": "new"})
+	next["ForeverFriends.toc"] = &fstest.MapFile{Data: append(next["ForeverFriends.toc"].Data, []byte("Missing.lua\n")...)}
+	if _, err := Install(next, dir, false, nil); err == nil {
+		t.Fatal("update with a missing file succeeded")
+	}
+	if got := read(t, filepath.Join(dir, "ForeverFriends/ForeverFriends.toc")); !strings.Contains(got, "Version: 0.1.0") {
+		t.Fatalf("toc already replaced:\n%s", got)
+	}
+}
+
+func TestInterruptedFirstInstallIsFinishedNotTreatedAsForeign(t *testing.T) {
+	dir := t.TempDir()
+	d := filepath.Join(dir, "ForeverFriends")
+	_ = os.MkdirAll(d, 0o755)
+	_ = os.WriteFile(filepath.Join(d, "Core.lua"), []byte("half"), 0o644)
+	_ = os.WriteFile(filepath.Join(d, "Pack.lua.tmp"), []byte("x"), 0o644)
+	rep, err := Install(addon("0.1.0", map[string]string{"Core.lua": "a", "Pack.lua": "b"}), dir, false, nil)
+	if err != nil || rep.Action != Installed || read(t, filepath.Join(d, "Core.lua")) != "a" {
+		t.Fatal(rep, err)
+	}
+}
+
 func TestOlderReplacedStaleRemovedOthersKept(t *testing.T) {
 	dir := t.TempDir()
-	_, _ = Install(addon("0.1.0", map[string]string{"Core.lua": "a", "Old.lua": "x"}), dir, nil)
+	_, _ = Install(addon("0.1.0", map[string]string{"Core.lua": "a", "Old.lua": "x"}), dir, false, nil)
 	_ = os.WriteFile(filepath.Join(dir, "ForeverFriends/notes.txt"), []byte("mine"), 0o644)
-	rep, err := Install(addon("0.2.0", map[string]string{"Core.lua": "a2"}), dir, nil)
+	rep, err := Install(addon("0.2.0", map[string]string{"Core.lua": "a2"}), dir, false, nil)
 	if err != nil || rep.Action != Updated {
 		t.Fatal(rep, err)
 	}
@@ -93,20 +122,20 @@ func TestOlderReplacedStaleRemovedOthersKept(t *testing.T) {
 func TestSameRepairedThenCurrent(t *testing.T) {
 	dir := t.TempDir()
 	src := addon("0.1.0", map[string]string{"Core.lua": "a"})
-	_, _ = Install(src, dir, nil)
-	if rep, _ := Install(src, dir, nil); rep.Action != Current {
+	_, _ = Install(src, dir, false, nil)
+	if rep, _ := Install(src, dir, false, nil); rep.Action != Current {
 		t.Fatal(rep)
 	}
 	_ = os.WriteFile(filepath.Join(dir, "ForeverFriends/Core.lua"), []byte("edited"), 0o644)
-	if rep, _ := Install(src, dir, nil); rep.Action != Repaired || read(t, filepath.Join(dir, "ForeverFriends/Core.lua")) != "a" {
+	if rep, _ := Install(src, dir, false, nil); rep.Action != Repaired || read(t, filepath.Join(dir, "ForeverFriends/Core.lua")) != "a" {
 		t.Fatal(rep)
 	}
 }
 
 func TestNewerLeftAlone(t *testing.T) {
 	dir := t.TempDir()
-	_, _ = Install(addon("0.3.0", map[string]string{"Core.lua": "new"}), dir, nil)
-	rep, err := Install(addon("0.1.0", map[string]string{"Core.lua": "old"}), dir, nil)
+	_, _ = Install(addon("0.3.0", map[string]string{"Core.lua": "new"}), dir, false, nil)
+	rep, err := Install(addon("0.1.0", map[string]string{"Core.lua": "old"}), dir, false, nil)
 	if err != nil || rep.Action != LeftNewer || read(t, filepath.Join(dir, "ForeverFriends/Core.lua")) != "new" {
 		t.Fatal(rep, err)
 	}
@@ -121,14 +150,14 @@ func TestLinkLeftAlone(t *testing.T) {
 	if err := os.Symlink(checkout, filepath.Join(dir, "ForeverFriends")); err != nil {
 		t.Fatal(err)
 	}
-	rep, err := Install(addon("0.1.0", map[string]string{"Core.lua": "a"}), dir, nil)
+	rep, err := Install(addon("0.1.0", map[string]string{"Core.lua": "a"}), dir, false, nil)
 	if err != nil || rep.Action != LeftLinked || read(t, filepath.Join(checkout, "Core.lua")) != "dev" {
 		t.Fatal(rep, err)
 	}
 	if _, err := os.Stat(filepath.Join(checkout, "ForeverFriends.toc")); err == nil {
 		t.Fatal("wrote through the link")
 	}
-	out := Remove(dir, "ForeverFriends")
+	out := Remove(dir, false, "ForeverFriends")
 	if len(out) != 1 || !strings.Contains(out[0], "link") {
 		t.Fatal(out)
 	}
@@ -142,20 +171,20 @@ func TestForeignFolder(t *testing.T) {
 	_ = os.MkdirAll(filepath.Join(dir, "ForeverFriends"), 0o755)
 	_ = os.WriteFile(filepath.Join(dir, "ForeverFriends/other.lua"), []byte("x"), 0o644)
 	src := addon("0.1.0", map[string]string{"Core.lua": "a"})
-	if _, err := Install(src, dir, nil); err != ErrForeign {
+	if _, err := Install(src, dir, false, nil); err != ErrForeign {
 		t.Fatal(err)
 	}
-	if rep, _ := Install(src, dir, func(string) bool { return false }); rep.Action != LeftForeign {
+	if rep, _ := Install(src, dir, false, func(string) bool { return false }); rep.Action != LeftForeign {
 		t.Fatal(rep)
 	}
-	if rep, err := Install(src, dir, func(string) bool { return true }); err != nil || rep.Action != Updated {
+	if rep, err := Install(src, dir, false, func(string) bool { return true }); err != nil || rep.Action != Updated {
 		t.Fatal(rep, err)
 	}
 }
 
 func TestListedFileMissingFromBuild(t *testing.T) {
 	src := fstest.MapFS{AddonName + ".toc": &fstest.MapFile{Data: []byte("## Interface: 1\n## Version: 1\nGone.lua\n")}}
-	if _, err := Install(src, t.TempDir(), nil); err == nil {
+	if _, err := Install(src, t.TempDir(), false, nil); err == nil {
 		t.Fatal("installed a toc whose file is missing")
 	}
 }
@@ -164,7 +193,7 @@ func TestRemoveOnlyNamedFolders(t *testing.T) {
 	dir := t.TempDir()
 	_ = os.MkdirAll(filepath.Join(dir, "ForeverFriends"), 0o755)
 	_ = os.MkdirAll(filepath.Join(dir, "Other"), 0o755)
-	out := Remove(dir, "ForeverFriends", "ForeverFriendsData", "../x")
+	out := Remove(dir, false, "ForeverFriends", "ForeverFriendsData", "../x")
 	if len(out) != 1 {
 		t.Fatal(out)
 	}

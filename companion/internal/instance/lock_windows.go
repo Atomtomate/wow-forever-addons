@@ -26,6 +26,3 @@ func TryAcquire(path string) (*Lock, error) {
 	}
 	return &Lock{f: os.NewFile(uintptr(h), path)}, nil
 }
-
-// Release gives the lock up.
-func (l *Lock) Release() { _ = l.f.Close() }

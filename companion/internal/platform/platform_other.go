@@ -50,11 +50,8 @@ func ListImages() ([]string, error) {
 	return out, nil
 }
 
-// OpenURL opens an http(s) address in the default browser.
+// OpenURL opens an address in the default browser; the caller builds it from a checked origin.
 func OpenURL(url string) error {
-	if !strings.HasPrefix(url, "https://") && !strings.HasPrefix(url, "http://") {
-		return errors.New("not a web address")
-	}
 	bin := "xdg-open"
 	if runtime.GOOS == "darwin" {
 		bin = "open"
@@ -63,7 +60,7 @@ func OpenURL(url string) error {
 }
 
 // SetAutostart is not offered off Windows.
-func SetAutostart(string) error { return errors.New("autostart is only built for Windows") }
+func SetAutostart(string, ...string) error { return errors.New("autostart is only built for Windows") }
 
 // RemoveAutostart has nothing to remove off Windows.
 func RemoveAutostart() error { return nil }

@@ -64,7 +64,7 @@ func TestHostileStringsStayLiterals(t *testing.T) {
 	for _, h := range hostile {
 		dir := t.TempDir()
 		r := wire.Roster{Members: []wire.RosterMember{{Name: h, Characters: []wire.RosterChar{{Name: h, Class: h, Level: 3, Main: true}}}}}
-		if _, err := Write(dir, r, "16001", time.Unix(5, 0)); err != nil {
+		if err := Write(dir, r, "16001", time.Unix(5, 0)); err != nil {
 			t.Fatal(err)
 		}
 		script := filepath.Join(dir, "check.lua")
@@ -99,50 +99,38 @@ func TestRenderNumbersOnlyFromFormatter(t *testing.T) {
 func TestWriteOnlyWhenDifferentIgnoringWritten(t *testing.T) {
 	dir := t.TempDir()
 	r := wire.Roster{Members: []wire.RosterMember{{Name: "Anna"}}}
-	if ch, err := Write(dir, r, "16001", time.Unix(100, 0)); err != nil || !ch {
-		t.Fatal(ch, err)
+	read := func() string { b, _ := os.ReadFile(filepath.Join(dir, "Data.lua")); return string(b) }
+	if err := Write(dir, r, "16001", time.Unix(100, 0)); err != nil {
+		t.Fatal(err)
 	}
-	if ch, err := Write(dir, r, "16001", time.Unix(999, 0)); err != nil || ch {
-		t.Fatal("rewritten for a new clock only", ch, err)
-	}
-	b, _ := os.ReadFile(filepath.Join(dir, "Data.lua"))
-	if !strings.Contains(string(b), "written = 100,") {
-		t.Fatal(string(b))
+	if err := Write(dir, r, "16001", time.Unix(999, 0)); err != nil || !strings.Contains(read(), "written = 100,") {
+		t.Fatal("rewritten for a new clock only:", read())
 	}
 	r.Members[0].Name = "Berta"
-	if ch, _ := Write(dir, r, "16001", time.Unix(200, 0)); !ch {
-		t.Fatal("change not written")
-	}
-	b, _ = os.ReadFile(filepath.Join(dir, "Data.lua"))
-	if !strings.Contains(string(b), "written = 200,") || !strings.Contains(string(b), "Berta") {
-		t.Fatal(string(b))
+	if err := Write(dir, r, "16001", time.Unix(200, 0)); err != nil || !strings.Contains(read(), "written = 200,") || !strings.Contains(read(), "Berta") {
+		t.Fatal(read())
 	}
 }
 
-func TestTocInterfaceCopiedAndValidated(t *testing.T) {
-	b, err := Toc("16001")
-	if err != nil || !strings.HasPrefix(string(b), "## Interface: 16001\n") || !strings.HasSuffix(string(b), "Data.lua\n") {
-		t.Fatal(string(b), err)
-	}
-	for _, bad := range []string{"", "16001\n## Evil: 1", "abc", "1"} {
-		if _, err := Toc(bad); err == nil {
-			t.Errorf("%q accepted", bad)
-		}
+func TestTocCopiesInterface(t *testing.T) {
+	b := string(Toc("16001"))
+	if !strings.HasPrefix(b, "## Interface: 16001\n") || !strings.HasSuffix(b, "Data.lua\n") {
+		t.Fatal(b)
 	}
 }
 
 func TestEnsureEmptyKeepsExistingList(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), FolderName)
-	if err := EnsureEmpty(dir, "16001"); err != nil {
-		t.Fatal(err)
+	if created, err := EnsureEmpty(dir, "16001"); err != nil || !created {
+		t.Fatal(created, err)
 	}
 	b, _ := os.ReadFile(filepath.Join(dir, "Data.lua"))
 	if string(b) != string(Render(wire.Roster{}, 0)) {
 		t.Fatal(string(b))
 	}
-	_, _ = Write(dir, wire.Roster{Members: []wire.RosterMember{{Name: "Anna"}}}, "16001", time.Unix(9, 0))
-	if err := EnsureEmpty(dir, "16001"); err != nil {
-		t.Fatal(err)
+	_ = Write(dir, wire.Roster{Members: []wire.RosterMember{{Name: "Anna"}}}, "16001", time.Unix(9, 0))
+	if created, err := EnsureEmpty(dir, "16001"); err != nil || created {
+		t.Fatal(created, err)
 	}
 	b, _ = os.ReadFile(filepath.Join(dir, "Data.lua"))
 	if !strings.Contains(string(b), "Anna") {
