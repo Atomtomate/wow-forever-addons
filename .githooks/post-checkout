@@ -1,0 +1,20 @@
+#!/bin/sh
+# Fills the agent-fleet submodule (.claude/agents) in a new worktree: `git worktree add` does
+# not check submodules out. Taken from the boardgame tracker's hook of the same name, where
+# the two traps below were reproduced. Leaves a submodule alone that has a branch checked out
+# inside it (someone is editing the fleet there). Never fails the checkout.
+# Activate once per clone: git config core.hooksPath .githooks
+cd "$(git rev-parse --show-toplevel)" 2>/dev/null || exit 0
+[ -f .gitmodules ] && grep -q '\.claude/agents' .gitmodules || exit 0
+# An uninitialised submodule is an empty directory, and git run inside one finds the outer
+# repository; so test for its .git first. Git also sets GIT_DIR for every hook, which a plain
+# `cd` does not override; so unset it in a subshell before asking the submodule for its HEAD.
+if [ -e .claude/agents/.git ] \
+    && (unset GIT_DIR GIT_WORK_TREE; cd .claude/agents && git symbolic-ref -q HEAD >/dev/null 2>&1); then
+    exit 0
+fi
+git submodule update --init .claude/agents
+if [ ! -f .claude/agents/CLAUDE.md ]; then
+    echo "post-checkout: .claude/agents is still empty (fleet repository unreachable?); run 'git submodule update --init .claude/agents' here, then start a fresh session" >&2
+fi
+exit 0

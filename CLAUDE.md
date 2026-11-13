@@ -28,6 +28,16 @@ style applies here too (lightweight, decisions written down, the owner merges).
 
 ## Working agreement
 
+- **Implementation goes through the agent fleet** (`.claude/agents/`, the owner's shared
+  `Atomtomate/agents`, a git submodule; mounted 2026-11-13 at the owner's direction): a plan
+  from `impl-director` first, a specialist in its own worktree, the four reviewers before the
+  owner sees the pull request. `.claude/agents/CLAUDE.md` is the fleet's manual and
+  `.claude/agents.local.md` this repository's answers to it. A session whose list of agents
+  does not show the fleet runs a definition through the manual's fallback. The tracker's
+  scripts, boards and hooks are not taken: this stays lightweight. Activate the hooks once per
+  clone with `git config core.hooksPath .githooks`; `post-checkout` fills the fleet submodule
+  in a new worktree, which a cloud session can only do when `Atomtomate/agents` is among its
+  repositories.
 - Each addon is independent: its own TOC, its own `spec/`, no shared Lua between addons unless
   a decision says so. Shared things are tooling only.
 - Pure logic (packing, maths, parsing) lives in files with no client globals so busted can load
