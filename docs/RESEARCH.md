@@ -171,6 +171,49 @@ All calls below are from the Forever-branch documentation unless noted **[opened
 5. Whether SavedVariables load at login on the launch build.
 6. Whether `count`/price fields are secret values (cannot be used in arithmetic) when read by an addon. **[unverified, high impact]**
 
+## 6. What an addon that links to the hub can read (2026-11-13)
+
+Read for D6 to D8 from the generated API documentation on the `forever` branch
+(`https://raw.githubusercontent.com/Gethe/wow-ui-source/forever/Interface/AddOns/Blizzard_APIDocumentationGenerated/<file>`).
+Every item is **[opened]**: the named file was fetched and the entry read. None of it has run
+in the client; a flag in a documentation file is not proof of behaviour (§4.1).
+
+- **The character's identity can be a secret value.** In `UnitDocumentation.lua`, `UnitName`,
+  `UnitFullName`, `UnitClass`, `UnitRace` and `UnitGUID` carry
+  `SecretWhenUnitIdentityRestricted = true`; `UnitLevel`, `UnitFactionGroup` and `UnitIsPlayer`
+  do not. `C_Secrets.ShouldUnitIdentityBeSecret(unit)` (`SecretPredicateAPIDocumentation.lua`)
+  "returns true if queries for unit identity (such as name or GUID) will produce secret
+  values". When identity is restricted, and whether it ever is for `"player"` out in the world,
+  the files do not say. Code that records the character must check before it stores, and code
+  that compares a unit's name with a list (a tooltip line) must survive a secret.
+- **Locale-independent tokens exist.** `UnitClass` returns `className, classFilename, classID`
+  and `UnitRace` returns `localizedRaceName, englishRaceName, raceID`. The group plays in
+  German, so anything sent to the hub uses `classFilename` and `englishRaceName`. The tokens of
+  the two Skyborne races are not in the documentation.
+- **Skills come from `C_SkillInfo`** (`SkillInfoDocumentation.lua`): `GetNumSkillLines()` and
+  `GetSkillLineInfo(index)`, which returns a `SkillLineAttributes` table with `skillID`, `name`
+  (localized), `isHeader`, `rank`, `maxRank`, `parentSkillLineID`, `skillLineCategoryID` and
+  more; the event is `SKILL_LINES_CHANGED`. Which `skillID` is which profession is not in the
+  file; `docs/CONTRACT.md` §4 uses the ids Classic and retail share, unverified for Forever.
+- **The addon list is readable** (`AddOnsDocumentation.lua`, namespace `C_AddOns`):
+  `GetNumAddOns`, `GetAddOnName(index)`, `GetAddOnInfo` (name, title, notes, loadable, reason,
+  security), `GetAddOnMetadata(name, variable)`, `GetAddOnEnableState(name, character)`,
+  `IsAddOnLoaded`.
+- **Addons can talk to each other in game.** `C_ChatInfo.SendAddonMessage(prefix, message,
+  chatType, target)` and `SendAddonMessageLogged` exist (`ChatInfoDocumentation.lua`), both
+  with `SecretArguments = "NotAllowed"`: a secret value cannot be sent. Not used in version
+  one; it is the route to in-game presence later (`docs/IDEAS.md`).
+- **The client says which platform it is**: `IsWindowsClient`, `IsMacClient`, `IsLinuxClient`
+  (`BuildDocumentation.lua`), beside `GetBuildInfo`.
+- `C_FriendList`, `C_GuildInfo.GuildRoster` and `C_BattleNet` exist; only their function names
+  were read.
+- Not in these files, so not checked: the tooltip hook (it is FrameXML Lua, not generated
+  documentation), the older global functions for professions and guild rosters, and the name of
+  the game's executable, which the companion needs to tell that the game is running.
+
+That an addon has no file or network access is standard knowledge and was not re-derived here
+**[unverified here]**; D7 rests on it.
+
 ## Open questions (max 8)
 1. Does the launch client still fail to load SavedVariables, and is Blizzard's fix scheduled?
 2. Are `ReplicateItems` results usable (non-secret) by an untainted addon on Forever?

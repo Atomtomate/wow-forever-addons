@@ -21,6 +21,9 @@ style applies here too (lightweight, decisions written down, the owner merges).
   moves gold or items. Scanning reads only. This is both Blizzard's rule and ours (D5).
 - **SavedVariables is the only output.** No file I/O, no network. Logs go into a capped ring
   table inside the addon's SavedVariables so they come out with the data.
+- **A unit's identity can be a secret value too.** `UnitName`, `UnitClass`, `UnitRace` and
+  `UnitGUID` are documented as secret when unit identity is restricted (`docs/RESEARCH.md` §6).
+  Check before storing or comparing one.
 
 ## Working agreement
 
@@ -33,8 +36,13 @@ style applies here too (lightweight, decisions written down, the owner merges).
   on an unlisted global: list it in `.luacheckrc` or make it local.
 - What a test cannot prove is written into the addon's `docs/` note as "verify in client" and
   into `docs/HANDOFF.md`, with the exact `/dump` or `/run` line to try.
-- Draft PRs; the owner says merge. Ask before a new library dependency (Ace3 and the like), a
-  SavedVariables format change that loses data, or anything that automates play.
+- Draft PRs; the owner says merge. Ask before a new library dependency (Ace3 and the like, and
+  any Go module for the companion, which uses the standard library only), a SavedVariables
+  format change that loses data, or anything that automates play.
+- **`docs/CONTRACT.md` is the one home of what the addon, the companion and the hub exchange.**
+  A change to a format changes it there first, and the other two parties in the same breath.
+  The companion (`companion/`, Go) reads one SavedVariables file per account and writes only
+  into the two ForeverFriends addon folders (D7).
 - Code copied from another addon carries its licence; prefer writing our own.
 
 ## Conventions
