@@ -33,7 +33,7 @@ loop are shared.
 | `tools/parse_sv.py` | turn a SavedVariables file into JSON and a short summary |
 | `.luacheckrc`, `.busted` | lint and test configuration, shared by every addon |
 | `.github/workflows/ci.yml` | luacheck and busted, and the Go checks on Linux and Windows, on every push and pull request |
-| `.github/workflows/release.yml` | builds the companion for Windows and Linux when a version tag is pushed |
+| `.github/workflows/release.yml` | builds the companion for Windows, Linux and macOS when a version tag is pushed |
 | `docs/` | research, decisions, handoff, ideas |
 
 ## Working on an addon
@@ -63,8 +63,8 @@ A release is a tag, and you push it. The tag must be `v` plus the `## Version` l
 `addons/ForeverFriends/ForeverFriends.toc` (`v0.1.0` for `## Version: 0.1.0`); the release
 workflow refuses any other. The addon and the companion share that one number, because the
 executable carries the addon: a fix to the companion alone still means raising that line first.
-The workflow builds the Windows and Linux files and publishes them as a GitHub release, which
-is where the hub's `/companion` page sends members.
+The workflow builds the Windows, Linux and macOS files and publishes them as a GitHub release,
+which is where the hub's `/companion` page sends members.
 
 ## Feedback loop
 
