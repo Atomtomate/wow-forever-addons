@@ -95,8 +95,13 @@ pull script, Remote Control) stays the developer's feedback loop.
 Releases are GitHub Releases of this repository, built by CI when the owner pushes a tag; the
 hub's profile page links to the latest one. The executable is unsigned, so Windows SmartScreen
 warns each member once. Windows is the supported platform for version one: setup, autostart
-and the background run are built for it. On macOS and Linux the same program builds and runs,
-started by hand.
+and the background run are built for it. On macOS and Linux the same program builds and, started
+by hand, links the PC, uploads the characters and writes the member list. What those two lack
+in version one: no autostart on either; on macOS the program does not look for the game at all,
+so nobody shows as in game from a Mac, and no macOS file is published until someone needs one;
+on Linux a file is published, and whether the game is found when it runs under Wine is not
+known. (The plan's direction review, 2026-11-13, found these narrowings recorded only in review
+files; whether anyone in the group plays on a Mac is a question put to the owner.)
 
 ## D8 — What crosses the wire, and what does not (2026-11-13)
 

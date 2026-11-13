@@ -41,8 +41,9 @@ style applies here too (lightweight, decisions written down, the owner merges).
   format change that loses data, or anything that automates play.
 - **`docs/CONTRACT.md` is the one home of what the addon, the companion and the hub exchange.**
   A change to a format changes it there first, and the other two parties in the same breath.
-  The companion (`companion/`, Go) reads one SavedVariables file per account and writes only
-  into the two ForeverFriends addon folders (D7).
+  Inside the game folder the companion (`companion/`, Go) reads one SavedVariables file per
+  account and writes only into the two ForeverFriends addon folders; outside it, it keeps its
+  own config folder, program copy and autostart entry (D7, `docs/CONTRACT.md` §5).
 - Code copied from another addon carries its licence; prefer writing our own.
 
 ## Conventions

@@ -8,7 +8,7 @@ build against it:
 |---|---|---|
 | **ForeverFriends**, the addon | inside the game | `addons/ForeverFriends/` (Lua) |
 | **the companion** | on each member's PC, beside the game | `companion/` (Go) |
-| **the hub** | the group's server | `wow-forever-hub`, `src/companion.js` and its routes |
+| **the hub** | the group's server | `wow-forever-hub`, the routes under `/api/companion/` and the modules behind them |
 
 ```
  game                        member's PC                      hub
@@ -334,9 +334,10 @@ implemented is the hub's (`wow-forever-hub`, `docs/DECISIONS.md` D17).
 - A character is matched to the member's existing characters by name, ignoring case. Found:
   class, race, level and professions are replaced by the game's; when two of the member's
   characters match, the one created first is updated. Not found: it is added. The role, the
-  note and which character is the main stay what the member chose on the site; when the
-  matched character is the main, the profile's main class and race follow it, as they do on
-  the site.
+  note and which character is the main stay what the member chose on the site, with one
+  exception: a role the game's class cannot have is cleared, as the site's own form does, since
+  the hub never stores a role its class table forbids. When the matched character is the main,
+  the profile's main class and race follow it, as they do on the site.
 - `realm` is read and not stored, so two characters of one name on two realms are one
   character on the hub: of several entries with one name in one upload, the one with the
   newest `seen` is used and the others are ignored with the reason `same name`.
