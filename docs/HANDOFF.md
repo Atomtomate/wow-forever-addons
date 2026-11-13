@@ -8,7 +8,7 @@ Read this after `CLAUDE.md`. Replace it when the next session closes.
   game. The owner then made the first addon the group installs **ForeverFriends**, the link
   between the game and the hub: members, their characters, online status (D6 to D8). Three
   programs build against one file, `docs/CONTRACT.md`.
-- **Open pull requests, all marked ready for review, all green, none merged:**
+- **Merged on 2026-11-13, on the owner's word, all six:**
 
   | Pull request | What | Review pass |
   |---|---|---|
@@ -32,22 +32,19 @@ Read this after `CLAUDE.md`. Replace it when the next session closes.
   exactly what to check: "Verify in client" in `addons/ForeverFriends/README.md` (8 items) and
   "Verify on the PC" in `companion/README.md` (15 items).
 
-## Merge order, when the owner says merge
+## What has to happen before anyone can use it
 
-1. `wow-forever-hub#12`, and the hub is updated on the PC, so a companion has something to link
-   to. `PUBLIC_URL` must be `https://` and `TRUST_PROXY=1` behind Caddy.
-2. #3 here.
-3. #4: this repository does not delete head branches on merge, so after #3 is merged #4 is
-   re-pointed to `main` by hand, then merged.
-4. The owner pushes the tag `v0.1.0` (it must be `v` plus the `## Version` line of
-   `addons/ForeverFriends/ForeverFriends.toc`); the release workflow builds the files the hub's
-   `/companion` page links to.
-
-The two fleet pull requests and `agents#28` are independent of all of these.
+1. The hub on the server is updated to `main` by the owner's ops session, so that a companion
+   has something to link to. `PUBLIC_URL` must be `https://` and `TRUST_PROXY=1` behind Caddy.
+   Until then the companion stops with `could not reach the site (status 404)`.
+2. The owner pushes the tag `v0.1.0` (it must be `v` plus the `## Version` line of
+   `addons/ForeverFriends/ForeverFriends.toc`). The release workflow, which has never run,
+   builds the files the hub's `/companion` page links to.
 
 ## First steps for the next session
 
-1. Ask the owner which pull requests may merge, in the order above.
+1. Ask the owner whether the ops session has updated the hub and whether the tag `v0.1.0` is
+   pushed; look at the release workflow's first run.
 2. With the owner at the PC, after the release: the companion's "Verify on the PC" list first
    (SmartScreen and Defender on an unsigned program that copies itself and adds a Run key is
    item 12: the owner sees it before any friend does), then the addon's "Verify in client" list.

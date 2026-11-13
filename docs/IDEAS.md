@@ -3,10 +3,10 @@
 The durable backlog; entries are updated, never deleted. Status words: **next**, **later**,
 **parked** (needs something external), **dropped** (with the reason).
 
-- **ForeverFriends, the link to the hub** — in progress, D6 to D8. The addon records the
-  character being played and shows the hub's member list; a companion program installs it,
-  uploads the characters, reports that the game is running and checks that the hub is
-  reachable. The wire formats are `docs/CONTRACT.md`.
+- **ForeverFriends, the link to the hub** — merged 2026-11-13 (D6 to D8), not yet run on a real PC
+  or in the game. The addon records the character being played and shows the hub's member list; a
+  companion program installs it, uploads the characters, reports that the game is running and checks
+  that the hub is reachable. The wire formats are `docs/CONTRACT.md`.
 - **MarketScan** — merged (PR #1), not yet run in the client. One-button full scan of the
   auction house, per-item minimum buyout, median, quantity and auction count, stored compactly
   in SavedVariables with a timestamp. Its "Verify in client" list is still open.
