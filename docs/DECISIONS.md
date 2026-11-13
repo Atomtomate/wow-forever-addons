@@ -118,3 +118,15 @@ it. The rules that shape them:
   members sharing a PC is a case version one does not handle (`docs/IDEAS.md`).
 - **The member list is typed by people and executed by the game**, so the companion writes it
   under the escaping rule in `docs/CONTRACT.md` §2 and the addon treats it as untrusted.
+- **A PC is linked by a logged-in member in the browser, and every request it sends is
+  signed.** The first draft had the member paste a secret line from their profile into the
+  companion. The owner, 2026-11-13: "Why can't we authenticate this? The companion tool
+  provides the login, get some token, that token is used to authenticate? ... Think about
+  secure alternatives as well", and of the four ways then put to them (browser approval;
+  browser approval plus signed requests; a password typed into the companion; the pasted line)
+  chose browser approval plus signed requests. So: the companion makes a key pair and shows a
+  short code; the member approves that code on the hub, where they are logged in; the hub keeps
+  only the public key; each request carries a signature and a rising sequence number
+  (`docs/CONTRACT.md` §3.1, §3.2). No person ever sees a secret, the hub's database holds none,
+  a recorded request cannot be sent twice, and a PC is cut off from the member's profile. The
+  member list goes only to PCs linked this way.
