@@ -24,9 +24,16 @@ The durable backlog; entries are updated, never deleted. Status words: **next**,
 - **The character's name next to "in game"** — parked. The client writes SavedVariables only at
   logout, so the name is not knowable while someone plays (D8). Unparks if the client turns out
   to flush the file earlier, or if addons relay it to a member whose companion uploads.
-- **Companion: update itself, a tray icon, autostart on macOS and Linux** — later. Self-update
-  runs downloaded code on friends' PCs and wants a signing story first (D7 rules it out for
-  now). The others wait for someone who needs them.
+- **Companion on macOS and Linux: find the game, a macOS download, autostart** — next, right
+  after version one. The owner, 2026-11-13: "we have mac and linux users". In version one a Mac
+  or Linux player links, uploads and gets the member list, started by hand, but never shows as
+  in game: the program does not look for the game on macOS, and on Linux a game under Wine or
+  Proton runs as the loader, not as a file in the game folder (matching the process's command
+  line is the likely way; nobody has tried it). Needs someone with a Mac and someone on Linux
+  to run the checks. Which comes first, this or the addon list, is the owner's to say.
+- **Companion: update itself, a tray icon** — later. Self-update runs downloaded code on
+  friends' PCs and wants a signing story first (D7 rules it out for now). A tray icon waits
+  for someone who misses it.
 - **Companion: two members on one PC** — later. One companion links one member (D8); a mapping
   from WoW account to member would lift that. Unparks when a couple asks.
 - **Companion installs MarketScan too** — later, once MarketScan has run in the client.

@@ -126,7 +126,9 @@ hub's address is an origin, `https://host[:port]`, with no path, query or fragme
 request is signed with (§3.2) must be the path the hub sees. The companion refuses any other
 scheme except `http` on a loopback host, which is how the hub is tested. The companion never
 follows a redirect. Binary values (`public_key`, `X-FF-Signature`) are standard base64 with
-padding (RFC 4648 §4).
+padding (RFC 4648 §4). Requests carry `User-Agent: ForeverFriendsCompanion/<version>`, which
+the hub does not read or keep. In a request body, a field whose value is `null` is read as left
+out.
 
 A failure answer is always `{ "ok": false, "error": "<one sentence>" }` with a status. Any
 status this section does not name, any redirect, and a 200 whose body is not JSON with
@@ -213,7 +215,8 @@ that device's public key (else 401), the sequence number is greater than the las
 (else 409, `{ "ok": false, "error": "stale sequence", "seq": <last accepted> }`). The hub
 accepts a number with one atomic update, so two requests with the same number cannot both
 pass. A request that passes all three uses up its sequence number whatever the body turns out
-to hold.
+to hold, with one exception: a `sync` from a device that is not linked yet is refused with 401
+before its number is used.
 
 The companion sends one request at a time, stores the next number before it sends, and uses a
 new number for every request, answered or not. On 409 it continues from the returned number
@@ -260,8 +263,8 @@ signature          /ugHnkaZUd3KLobU7MuwmJfVZHMDdseFQ0WO5IjfJh0xvHvEWIB8dSWXhpVvP
 | `v` | yes | `1`. The hub answers any other value with 400 `unsupported version`. |
 | `game_running` | yes | whether a process of this game installation is running right now |
 | `characters` | no | sent when a SavedVariables file changed since the last sync the hub answered with 200, and always on the first sync after linking: the merged entries of every account on this PC, as §1 has them, without the skills' names |
-| `outage` | no | sent once, on the first success after at least two consecutive failed requests: `from` is the first failure, `to` this request, both the companion's clock in UTC |
-| `roster_etag` | no | the `roster_etag` of the member list the companion last wrote, sent only while that `Data.lua` still exists |
+| `outage` | no | after two consecutive failed requests, every request carries it until one is answered: `from` is the first failure, `to` this request, both the companion's clock in UTC. The hub keeps one report per `from`, so a request that was stored but whose answer was lost does not count twice |
+| `roster_etag` | no | the `roster_etag` of the member list the companion last wrote, sent only while `Data.lua` in the game folder it now uses still holds that list; not for the empty first file, and not after the game folder changed |
 
 Answer, 200:
 
@@ -292,8 +295,9 @@ The member list holds every account on the hub, in order of name. `name` is the 
 or the username when that is empty. A member's characters come main first, then by name.
 `class` is the hub's name (`Shaman`); `level` is left out when the hub does not know it and
 `main` when it is false. A member's name is at most 160 bytes, a character's at most 64, and a
-member has at most 60 characters; a reader skips an entry outside these bounds and keeps the
-rest, and refuses the list only when its shape is wrong. Real names, BattleTags and everything
+member has at most 60 characters; the hub leaves out a character whose name is longer, and a
+reader skips an entry outside these bounds and keeps the rest, refusing the list only when
+its shape is wrong. Real names, BattleTags and everything
 else on a profile stay on the hub.
 
 Other answers:
@@ -318,9 +322,11 @@ longer than 64 bytes. The hub stores an outage with its own receive time and dro
 
 Timing: one sync every 60 s while the game runs, every 300 s while it does not, and one at once
 when the game starts or exits; the companion looks for the game's process at least every 15 s.
-After a failed request it tries again sooner, at most every 30 s. After the companion resumes
-from sleep, failures in its first 60 s are not counted: a laptop's own network coming back is
-not the hub being down.
+After a failed request it tries again in 30 s; after five failures in a row it tries every
+120 s, or at its normal pace where that is faster. Resuming from sleep starts the count of
+failures afresh, and failures in the first 60 s after it are not counted: a laptop's own
+network coming back is not the hub being down. Sleep is told by the wall clock, since a
+clock that stops while the PC sleeps cannot see it.
 The hub shows a member as in game while any of their devices' last sync with
 `game_running: true` is younger than 150 s, and stops at once on a sync from that device that
 says `false`.
@@ -339,7 +345,13 @@ implemented is the hub's (`wow-forever-hub`, `docs/DECISIONS.md` D17).
   note and which character is the main stay what the member chose on the site, with one
   exception: a role the game's class cannot have is cleared, as the site's own form does, since
   the hub never stores a role its class table forbids. When the matched character is the main,
-  the profile's main class and race follow it, as they do on the site.
+  the profile's main class and race follow it, as they do on the site; the profile's main
+  role is the member's and a sync leaves it.
+- **An older file never overwrites a newer one.** The hub keeps, for each character, the `seen`
+  of the newest entry it stored, and ignores an entry whose `seen` is older, with the reason
+  `older`. A member's second PC holding last week's file therefore changes nothing. An entry
+  with the same `seen` is applied (the addon moves `seen` only on a read that named the
+  character, so a level may change under one `seen`). The hub never shows this number.
 - `realm` is read and not stored, so two characters of one name on two realms are one
   character on the hub: of several entries with one name in one upload, the one with the
   newest `seen` is used and the others are ignored with the reason `same name`.
@@ -348,8 +360,9 @@ implemented is the hub's (`wow-forever-hub`, `docs/DECISIONS.md` D17).
 - A character missing from an upload is left alone. Nothing is ever deleted by a sync.
 - `class` is mapped from the client's token; an unknown token means the character is ignored
   with a reason. `race` is mapped likewise; an unknown token, or one whose class the hub's
-  race and class table does not allow, does not set a race: a new character gets none, a
-  matched one keeps its own.
+  race and class table does not allow, does not set a race: a new character gets none, and a
+  matched one keeps its own as long as the class from the game allows that race; if not, it
+  has none, since the hub never stores a pair its table forbids.
 - A skill line is a profession when its `id` is in the table below; other lines are dropped. A
   `rank` outside 1 to 300 is stored without a rank. An entry that carries `skills` has its
   professions replaced by what that list holds, even when it holds none; an entry without
@@ -380,13 +393,21 @@ The class and race tokens and the skill line ids are the ones Classic and retail
 that Forever uses the same is **not verified** until the first run in the client
 (`addons/ForeverFriends/README.md`, "Verify in client").
 
-## 5. What never crosses
+## 5. What crosses, and what never does
 
-Gold, play time, location, gear, guild notes, chat, anything about other players. Beside the
-characters and the running flag, the hub learns the PC's name and its public key when it is
-linked, and nothing else about the PC. The hub shows no "last seen" and no time of a sync (its
-D10 and D15). Inside the game folder the companion
-reads one file per account, `SavedVariables/ForeverFriends.lua`, and writes only inside
-`Interface/AddOns/ForeverFriends` and `Interface/AddOns/ForeverFriendsData`. Outside it, it
-keeps its own config folder (the key, the hub's address, its state and a small log), its own
-program folder, and its autostart entry.
+To the hub: each character with its name, realm, class, race, level, skill lines and `seen`
+(the game's time of the last read that named it); whether the game is running; after a stretch
+in which the hub could not be reached, when that stretch began and ended; and, once, when a PC
+is linked, the PC's name and its public key. To the game: members' display names and their
+characters with class and level.
+
+Never: gold, play time, location, gear, guild notes, chat, anything about other players, and
+nothing else about the PC. The hub keeps `seen` only to order uploads (§4) and shows no "last
+seen" and no time of a sync or of a PC (its D10 and D15).
+
+Of the game's files the companion reads one per account, `SavedVariables/ForeverFriends.lua`,
+and it writes only inside `Interface/AddOns/ForeverFriends` and
+`Interface/AddOns/ForeverFriendsData`. To know whether the game runs it looks at which programs
+are running, and at nothing inside them. Outside the game folder it keeps its own config folder
+(the key, the hub's address, its state and a small log), its own program folder, and its
+autostart entry.

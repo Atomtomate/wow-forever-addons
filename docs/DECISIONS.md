@@ -101,7 +101,11 @@ in version one: no autostart on either; on macOS the program does not look for t
 so nobody shows as in game from a Mac, and no macOS file is published until someone needs one;
 on Linux a file is published, and whether the game is found when it runs under Wine is not
 known. (The plan's direction review, 2026-11-13, found these narrowings recorded only in review
-files; whether anyone in the group plays on a Mac is a question put to the owner.)
+files.) Asked whether anyone plays on a Mac, the owner answered the same day: "we have mac and
+linux users". So these two are not a footnote: finding the game on macOS and under Wine or
+Proton on Linux, a macOS download and autostart on both are the work right after version one
+(`docs/IDEAS.md`), and until then a Mac or Linux player links, uploads and gets the member
+list, but does not show as in game.
 
 ## D8 — What crosses the wire, and what does not (2026-11-13)
 
@@ -136,3 +140,9 @@ it. The rules that shape them:
   a recorded request cannot be sent twice, and a PC is cut off from the member's profile. The
   member list goes only to PCs linked this way. Linking adds two things to what reaches the
   hub: the PC's name, so the member can tell their PCs apart, and its public key.
+- **The hub keeps the game's time of a character's last read and never shows it.** Two
+  reviewers of the hub's side found that a member with two PCs could have last week's file
+  from one overwrite today's from the other. Asked whether the hub may keep that time, hidden,
+  only to refuse an older upload, the owner chose "Store it, never show it" (2026-11-13). So
+  "nothing else" in the first rule above reads with `docs/CONTRACT.md` §5, which lists every
+  field that crosses, `seen` and the outage stretch included.
