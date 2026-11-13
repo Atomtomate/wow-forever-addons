@@ -32,12 +32,12 @@ func TestConfigMissingIsEmptyAndRoundTrips(t *testing.T) {
 	if err != nil || c.Hub != "" {
 		t.Fatal(c, err)
 	}
-	c = Config{Hub: "https://h", Device: "0123456789abcdef", Pending: &Pending{Code: "ABCD-EFGH", ExpiresUnix: 5}}
+	c = Config{Hub: "https://h", Device: "0123456789abcdef", Pending: &Pending{Code: "HKRT-BCDF", ExpiresUnix: 5}}
 	if err := d.Save(c); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := d.Load()
-	if got.Hub != c.Hub || got.Pending == nil || got.Pending.Code != "ABCD-EFGH" {
+	if got.Hub != c.Hub || got.Pending == nil || got.Pending.Code != "HKRT-BCDF" {
 		t.Fatal(got)
 	}
 }
