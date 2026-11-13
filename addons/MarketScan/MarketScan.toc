@@ -1,0 +1,9 @@
+## Interface: 16001
+## Title: MarketScan
+## Notes: One button scans the auction house into SavedVariables. Reads only, never buys or posts.
+## Author: Forever Friends
+## Version: 0.1.0
+## SavedVariables: MarketScanDB
+
+Pack.lua
+Core.lua
