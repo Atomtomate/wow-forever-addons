@@ -38,12 +38,38 @@ describe("ForeverFriends Snapshot (pure)", function()
             assert.is_nil(ns.usable(wow.secret(), "count"))
         end)
 
-        it("rejects a secret that allows concatenation but not comparison", function()
-            local later = setmetatable({}, {
-                __concat = function() return setmetatable({}, getmetatable(wow.secret())) end,
-                __eq = function() error("compare") end,
-            })
-            assert.is_nil(ns.usable(later, "string"))
+        -- On the client a secret keeps its underlying type(), and comparing it is what raises. Lua 5.1
+        -- calls __eq only between two tables sharing the handler, so these secrets share one, and
+        -- type() is made to lie. Without the probe each of these specs fails.
+        local function withType(v, claimed, fn)
+            local real = _G.type
+            _G.type = function(x) return rawequal(x, v) and claimed or real(x) end
+            local ok, err = pcall(fn)
+            _G.type = real
+            assert(ok, err)
+        end
+
+        it("rejects a secret that reports the type string", function()
+            local secret = wow.secret()
+            withType(secret, "string", function() assert.is_nil(ns.usable(secret, "string")) end)
+        end)
+
+        it("rejects a secret that reports the type number", function()
+            local secret = wow.secret()
+            withType(secret, "number", function()
+                assert.is_nil(ns.usable(secret, "level"))
+                assert.is_nil(ns.usable(secret, "count"))
+            end)
+        end)
+
+        it("rejects a secret that allows concatenation and arithmetic but not comparison", function()
+            local mt = {}
+            mt.__concat = function() return setmetatable({}, mt) end
+            mt.__add = function() return setmetatable({}, mt) end
+            mt.__eq = function() error("compare") end
+            local text, number = setmetatable({}, mt), setmetatable({}, mt)
+            withType(text, "string", function() assert.is_nil(ns.usable(text, "string")) end)
+            withType(number, "number", function() assert.is_nil(ns.usable(number, "level")) end)
         end)
     end)
 
@@ -54,42 +80,58 @@ describe("ForeverFriends Snapshot (pure)", function()
             return r
         end
 
-        it("writes the contract's shape", function()
+        it("writes the contract's shape under the key name-realm", function()
             local skills = { { id = 171, name = "Alchimie", rank = 145, max = 150 } }
-            local key, entry = ns.buildEntry(nil, read({ skills = skills }), 1763000000)
+            local key, entry = ns.buildEntry({}, read({ skills = skills }), 1763000000)
             assert.are.equal("Thrallina-Everlook", key)
             assert.are.same({ name = "Thrallina", realm = "Everlook", class = "SHAMAN", race = "Orc", level = 23,
                 skills = skills, seen = 1763000000 }, entry)
         end)
 
-        it("keeps the old fields when the new read is nil or secret", function()
+        it("finds the old entry itself and keeps its fields on nil and secret", function()
             local old = { name = "Thrallina", realm = "Everlook", class = "SHAMAN", race = "Orc", level = 22,
                 skills = { { id = 1, name = "", rank = 1, max = 1 } }, seen = 5 }
-            local _, entry = ns.buildEntry(old, read({ race = wow.secret(), level = wow.secret() }), 9)
+            local characters = { ["Thrallina-Everlook"] = old }
+            local _, entry = ns.buildEntry(characters, read({ race = wow.secret(), level = wow.secret() }), 9)
             assert.are.equal("Orc", entry.race)
             assert.are.equal(22, entry.level)
             assert.are.equal(1, #entry.skills)
             assert.are.equal(9, entry.seen)
-        end)
-
-        it("does not touch the old entry", function()
-            local old = { name = "Thrallina", realm = "Everlook", class = "SHAMAN", level = 22 }
-            ns.buildEntry(old, read(), 9)
             assert.are.equal(22, old.level)
         end)
 
-        it("creates nothing without a usable name or realm", function()
-            assert.is_nil(ns.buildEntry(nil, read({ name = wow.secret() }), 9))
-            assert.is_nil(ns.buildEntry(nil, read({ realm = wow.secret() }), 9))
+        it("creates nothing without a usable name or realm, nor a remembered one", function()
+            assert.is_nil(ns.buildEntry({}, read({ name = wow.secret() }), 9))
+            assert.is_nil(ns.buildEntry({}, read({ realm = wow.secret() }), 9))
+            assert.is_nil(ns.buildEntry({}, read({ name = wow.secret() }), 9, {}))
         end)
 
         it("creates nothing without a class, but updates an entry that has one", function()
-            assert.is_nil(ns.buildEntry(nil, read({ class = wow.secret() }), 9))
+            assert.is_nil(ns.buildEntry({}, read({ class = wow.secret() }), 9))
             local old = { name = "Thrallina", realm = "Everlook", class = "SHAMAN", seen = 5 }
-            local _, entry = ns.buildEntry(old, read({ class = wow.secret(), level = 24 }), 9)
+            local characters = { ["Thrallina-Everlook"] = old }
+            local _, entry = ns.buildEntry(characters, read({ class = wow.secret(), level = 24 }), 9)
             assert.are.equal("SHAMAN", entry.class)
             assert.are.equal(24, entry.level)
-            assert.are.equal(5, entry.seen) -- the read did not name the class, so it is not a refresh
+            assert.are.equal(5, entry.seen) -- the read did not give the class, so it is not a refresh
+        end)
+
+        it("uses the remembered character for a read the client would not name, without moving seen", function()
+            local old = { name = "Thrallina", realm = "Everlook", class = "SHAMAN", level = 22, seen = 5 }
+            local characters = { ["Thrallina-Everlook"] = old }
+            local remembered = { name = "Thrallina", realm = "Everlook" }
+            local key, entry = ns.buildEntry(characters, read({ name = wow.secret(), level = 24 }), 9, remembered)
+            assert.are.equal("Thrallina-Everlook", key)
+            assert.are.equal(24, entry.level)
+            assert.are.equal(5, entry.seen)
+        end)
+
+        it("does not move seen when the read did not name the character, class or not", function()
+            local old = { name = "Thrallina", realm = "Everlook", class = "SHAMAN", seen = 5 }
+            local characters = { ["Thrallina-Everlook"] = old }
+            local remembered = { name = "Thrallina", realm = "Everlook" }
+            local _, entry = ns.buildEntry(characters, read({ name = wow.secret() }), 9, remembered)
+            assert.are.equal(5, entry.seen)
         end)
     end)
 
@@ -115,11 +157,11 @@ describe("ForeverFriends Snapshot (pure)", function()
             assert.is_true(truncated)
         end)
 
-        it("drops a line with a secret id or rank, never guessing", function()
-            local list = { wow.skill(171, wow.secret(), 150), wow.skill(wow.secret(), 1, 2), wow.skill(164, 1, 75) }
-            local skills = ns.collectSkills(3, lines(list))
-            assert.are.equal(1, #skills)
-            assert.are.equal(164, skills[1].id)
+        it("keeps the old list when any line has a secret or missing id, rank or maxRank", function()
+            for _, bad in ipairs({ wow.skill(171, wow.secret(), 150), wow.skill(wow.secret(), 1, 2),
+                wow.skill(171, 1, nil), wow.skill(171, nil, 150) }) do
+                assert.is_nil(ns.collectSkills(2, lines({ wow.skill(164, 1, 75), bad })))
+            end
         end)
 
         it("stores an empty name when the name is secret", function()
@@ -154,24 +196,13 @@ describe("ForeverFriends Snapshot (pure)", function()
             assert.are.same(empty, ns.normalise({ characters = {} }))
         end)
 
-        it("repairs the parts of a version 1 table and keeps its characters", function()
+        it("keeps a version 1 table and makes sure of its two tables", function()
             local kept = { name = "A", realm = "R", class = "MAGE" }
-            local db = ns.normalise({ version = 1, characters = { ["A-R"] = kept, bad = 5, [3] = {} }, log = "x" })
+            local db = ns.normalise({ version = 1, characters = { ["A-R"] = kept }, log = { "a" } })
             assert.are.equal(kept, db.characters["A-R"])
-            assert.is_nil(db.characters.bad)
-            assert.is_nil(db.characters[3])
-            assert.are.same({}, db.log)
-            db = ns.normalise({ version = 1, characters = "x", log = { "a", 5, "b" } })
-            assert.are.same({}, db.characters)
-            assert.are.same({ "a", "b" }, db.log)
-        end)
-
-        it("trims a long loaded-back log", function()
-            local log = {}
-            for i = 1, 200 do log[i] = "l" .. i end
-            local db = ns.normalise({ version = 1, characters = {}, log = log })
-            assert.are.equal(50, #db.log)
-            assert.are.equal("l200", db.log[50])
+            assert.are.same({ "a" }, db.log)
+            local repaired = ns.normalise({ version = 1, characters = "x", log = 3 })
+            assert.are.same({ version = 1, characters = {}, log = {} }, repaired)
         end)
     end)
 end)

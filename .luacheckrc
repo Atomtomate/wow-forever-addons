@@ -46,9 +46,14 @@ files["spec/**"] = {
 
 files["addons/*/spec/**"] = {
     std = "+busted",
-    globals = {
-        "_G", "SLASH_MARKETSCAN1", "SLASH_MARKETSCAN2", "MarketScanDB", "AuctionHouseFrame",
-        "ForeverFriendsDB", "ForeverFriendsData", "SLASH_FOREVERFRIENDS1", "SLASH_FOREVERFRIENDS2",
-    },
+    globals = { "_G" },
     ignore = { "122" },
 }
+
+-- Pure files see no client global at all: "pure" is checked here, not only said in a comment.
+for _, file in ipairs({
+    "addons/ForeverFriends/Snapshot.lua", "addons/ForeverFriends/Roster.lua",
+    "addons/ForeverFriends/Lines.lua", "addons/MarketScan/Pack.lua",
+}) do
+    files[file] = { new_globals = {}, new_read_globals = {} }
+end
