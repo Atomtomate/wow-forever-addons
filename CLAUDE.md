@@ -45,7 +45,9 @@ style applies here too (lightweight, decisions written down, the owner merges).
   file, `docs/HANDOFF.md` and the contract, not from a carried conversation. A piece that
   cannot finish is committed, what is left goes into the pull request's body, and the session
   stops. `.claude/settings.json` caps a context at 400,000 tokens; that is the backstop, not
-  the plan (the owner, 2026-11-13, after one session grew to 900,000).
+  the plan (the owner, 2026-11-13, after one session grew to 900,000). The session that coordinates
+  does not do the work itself: it briefs, reviews and decides, and hands edits, pushes and
+  bookkeeping to an agent on a cheaper model or to a session of its own.
 - Ask before a new library dependency (Ace3 and the like, and any Go module for the companion,
   which uses the standard library only), a SavedVariables format change that loses data, or
   anything that automates play.
