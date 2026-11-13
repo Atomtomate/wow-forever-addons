@@ -1,0 +1,44 @@
+name: Release
+# A release is a tag. The tag must be "v" plus the "## Version" line of the addon's .toc: the
+# addon and the companion share that one number. workflow_dispatch builds the files and keeps them
+# as a run artifact without publishing anything.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: The tag is v plus the addon's version
+        run: |
+          v=$(sed -n 's/^## Version:[[:space:]]*//p' addons/ForeverFriends/ForeverFriends.toc | tr -d '\r')
+          [ -n "$v" ] || { echo "::error::no ## Version line in ForeverFriends.toc"; exit 1; }
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$v" ]; then
+            echo "::error::tag $GITHUB_REF_NAME is not v$v (the ## Version line of addons/ForeverFriends/ForeverFriends.toc)"
+            exit 1
+          fi
+      - run: sudo apt-get install -y lua5.1
+      - run: go vet ./... && go test ./...
+      - name: Build Windows and Linux
+        run: |
+          mkdir dist
+          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H=windowsgui" -o dist/ForeverFriendsCompanion-windows-amd64.exe ./companion
+          GOOS=linux GOARCH=amd64 go build -trimpath -o dist/ForeverFriendsCompanion-linux-amd64 ./companion
+          (cd dist && sha256sum * > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        if: github.ref_type != 'tag'
+        with:
+          name: companion
+          path: dist/*
+      - name: Publish
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes

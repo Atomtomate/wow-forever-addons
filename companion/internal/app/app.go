@@ -78,7 +78,9 @@ func Main(ctx context.Context, args []string, env Env) int {
 	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
 		cmd, args = args[0], args[1:]
 	}
-	if cmd != "run" && env.P.PrepareConsole != nil {
+	// run is the background command and must never show a window; version is read by setup
+	// through a pipe, which attaching to a console would bypass.
+	if cmd != "run" && cmd != "version" && cmd != "--version" && env.P.PrepareConsole != nil {
 		env.P.PrepareConsole()
 	}
 	if env.Stdin == nil {
