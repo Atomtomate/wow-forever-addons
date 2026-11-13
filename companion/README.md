@@ -134,3 +134,6 @@ runner without a game). Each is a check on the owner's PC; none is claimed to wo
     when it cannot delete itself.
 13. **The hub behind Caddy**: `PUBLIC_URL` is `https://`, `TRUST_PROXY=1`, and Caddy passes the `X-FF-*`
     headers and the body unchanged: a link from a member's PC, then a sync, is the test.
+14. **Line endings of the real `ForeverFriends.lua`**: the parser reads CRLF and LF, but check what the client writes:
+    `Get-Content "<game>\WTF\Account\<ACCOUNT>\SavedVariables\ForeverFriends.lua" -Raw | Select-String "`r`n" -Quiet`
+    (True means CRLF); then `ForeverFriendsCompanion.exe run --once` should print `sync: ok` either way.

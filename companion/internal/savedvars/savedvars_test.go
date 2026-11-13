@@ -236,3 +236,40 @@ func TestFingerprintChangesWithFile(t *testing.T) {
 		t.Fatal("same fingerprint")
 	}
 }
+
+// The client runs on Windows and may write CRLF; git on Windows may also check the sample out
+// that way. Line endings between tokens, after a comment and at the end of the file must not
+// matter, and a line break inside a long string reads as one \n, as in Lua.
+func TestCRLFReadsLikeLF(t *testing.T) {
+	src, _ := os.ReadFile("testdata/sample.lua")
+	lf := strings.ReplaceAll(string(src), "\r\n", "\n")
+	crlf := strings.ReplaceAll(lf, "\n", "\r\n")
+	a, err := Parse([]byte(lf))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := Parse([]byte(crlf))
+	if err != nil {
+		t.Fatalf("CRLF form: %v", err)
+	}
+	if !reflect.DeepEqual(normalise(t, pythonShape(&Table{Keys: []Value{"a"}, Vals: []Value{tableOf(a)}})), normalise(t, pythonShape(&Table{Keys: []Value{"a"}, Vals: []Value{tableOf(b)}}))) {
+		t.Fatal("CRLF file parsed differently")
+	}
+	for _, s := range []string{"X = 1 -- comment\r\n", "X = { 1, -- [1]\r\n 2 } -- end", "X = \"a\\\r\nb\"\r\n"} {
+		if _, err := Parse([]byte(s)); err != nil {
+			t.Errorf("%q: %v", s, err)
+		}
+	}
+	top, _ := Parse([]byte("X = \"a\\\r\nb\"\r\n"))
+	if top["X"] != "a\nb" {
+		t.Fatalf("%q", top["X"])
+	}
+}
+
+func tableOf(m map[string]Value) *Table {
+	t := &Table{}
+	for k, v := range m {
+		t.Keys, t.Vals = append(t.Keys, k), append(t.Vals, v)
+	}
+	return t
+}

@@ -17,6 +17,7 @@ jobs:
       - run: busted --output=plainTerminal
   go:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}

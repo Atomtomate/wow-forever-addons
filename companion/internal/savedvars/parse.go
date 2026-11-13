@@ -174,11 +174,9 @@ func (p *parser) longBody(lvl int) (string, error) {
 	}
 	body := p.s[p.i : p.i+end]
 	p.i += end + len(closer)
-	if strings.HasPrefix(body, "\r\n") {
-		body = body[2:]
-	} else if strings.HasPrefix(body, "\n") {
-		body = body[1:]
-	}
+	// Lua reads \r\n, \n\r, \n and \r inside a long string as one \n.
+	body = strings.NewReplacer("\r\n", "\n", "\n\r", "\n", "\r", "\n").Replace(body)
+	body = strings.TrimPrefix(body, "\n")
 	return body, nil
 }
 
@@ -284,6 +282,12 @@ func (p *parser) quoted(q byte) (Value, error) {
 				return nil, fail("string not closed")
 			}
 			e := p.s[p.i]
+			if e == '\r' { // a backslash before a CRLF line break is one newline
+				e = '\n'
+				if p.i+1 < len(p.s) && p.s[p.i+1] == '\n' {
+					p.i++
+				}
+			}
 			if isDigit(e) {
 				n, j := 0, p.i
 				for j < len(p.s) && j < p.i+3 && isDigit(p.s[j]) {
