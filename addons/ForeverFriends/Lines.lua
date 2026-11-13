@@ -3,29 +3,13 @@
 local _, ns = ...
 
 local PREFIX = "ForeverFriends: "
-local MAX_LINE = 240 -- bytes; one readable line
+local LINE_BUDGET = 240 -- bytes `fit` aims for; a longer line only wraps in chat
 local SUFFIX_RESERVE = 20 -- room for " and 999 more"
 local USAGE = "/ff, /ff members, /ff who <name>, /ff status."
 
 -- Drops control characters and doubles every |, so a name cannot carry a colour code or hyperlink.
 function ns.clean(s)
     return (s:gsub("[%z\1-\31\127]", ""):gsub("|", "||"))
-end
-
--- Cuts at a character boundary to at most max bytes, and never leaves a lone | at the end.
-local function cut(s, max)
-    if #s <= max then
-        return s
-    end
-    s = s:sub(1, max)
-    while #s > 0 and s:byte(#s) >= 0x80 and s:byte(#s) < 0xC0 do
-        s = s:sub(1, #s - 1)
-    end
-    if #s > 0 and s:byte(#s) >= 0xC0 then
-        s = s:sub(1, #s - 1)
-    end
-    local pipes = #s:match("|*$")
-    return pipes % 2 == 1 and s:sub(1, #s - 1) or s
 end
 
 -- As many parts as fit in the budget, then "and N more". Always at least one part.
@@ -41,12 +25,12 @@ local function fit(parts, separator, budget)
     return out
 end
 
+local function plural(n, word)
+    return n .. " " .. word .. (n == 1 and "" or "s")
+end
+
 local function describe(character)
-    local detail = {}
-    if character.class then
-        detail[#detail + 1] = ns.clean(character.class)
-    end
-    local facts = table.concat(detail, " ")
+    local facts = character.class and ns.clean(character.class) or ""
     if character.level then
         facts = facts .. (facts == "" and "" or " ") .. character.level
     end
@@ -76,9 +60,9 @@ local function who(members, query)
     end
     local segments = {}
     for _, m in ipairs(matches) do
-        segments[#segments + 1] = member(m, MAX_LINE - #PREFIX)
+        segments[#segments + 1] = member(m, LINE_BUDGET - #PREFIX)
     end
-    return fit(segments, "; ", MAX_LINE - #PREFIX)
+    return fit(segments, "; ", LINE_BUDGET - #PREFIX)
 end
 
 local function names(members)
@@ -86,7 +70,7 @@ local function names(members)
     for _, m in ipairs(members) do
         parts[#parts + 1] = ns.clean(m.name)
     end
-    return fit(parts, ", ", MAX_LINE - #PREFIX) .. "."
+    return fit(parts, ", ", LINE_BUDGET - #PREFIX) .. "."
 end
 
 local REASONS = {
@@ -102,9 +86,9 @@ function ns.respond(message, data, own)
     local command, argument = (message or ""):match("^%s*(%S*)%s*(.-)%s*$")
     command = command:lower()
     if command == "status" then
-        local line = own.count .. " characters recorded"
+        local line = plural(own.count, "character") .. " recorded"
         line = own.key and line .. ", this one is " .. ns.clean(own.key) .. "." or line .. "."
-        return cut(PREFIX .. line, MAX_LINE)
+        return PREFIX .. line
     end
     if command ~= "" and command ~= "members" and not (command == "who" and argument ~= "") then
         return PREFIX .. USAGE
@@ -119,8 +103,9 @@ function ns.respond(message, data, own)
     elseif command == "who" then
         line = who(members, argument)
     else
-        line = #members .. " members, " .. ns.countCharacters(members) .. " characters. "
+        local characters = ns.countCharacters(members)
+        line = plural(#members, "member") .. ", " .. plural(characters, "character") .. ". "
             .. "/ff members, /ff who <name>, /ff status."
     end
-    return cut(PREFIX .. line, MAX_LINE)
+    return PREFIX .. line
 end

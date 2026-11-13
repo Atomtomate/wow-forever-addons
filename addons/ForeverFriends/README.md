@@ -6,11 +6,10 @@ prints nothing at login, and shows no time about anyone.
 
 ## Install
 
-The companion program installs it (`docs/CONTRACT.md` §2). By hand for development: run
+The companion installs it (`docs/CONTRACT.md` §2). By hand for development: run
 `tools/link.ps1 ForeverFriends` from the checkout (a directory junction into
-`_forever_\Interface\AddOns`) and restart the client once. The member list comes from a second
-addon folder, `ForeverFriendsData`, which the companion writes; without it the addon still records
-the character and `/ff` says there is no list yet.
+`_forever_\Interface\AddOns`) and restart the client once. Without the companion's second addon
+folder, `ForeverFriendsData`, the addon still records the character and `/ff` says there is no list yet.
 
 ## Use
 
@@ -24,14 +23,12 @@ the character and `/ff` says there is no list yet.
 
 The addon records at login, on a level-up, a moment after the skill lines change, and at logout.
 The client writes `WTF/Account/<ACCOUNT>/SavedVariables/ForeverFriends.lua` at logout and `/reload`.
-Text from the member list is shown with control characters dropped and every `|` doubled.
 
 ## The data
 
 The format of `ForeverFriendsDB` (what is written) and of `ForeverFriendsData` (what is read) is
 `docs/CONTRACT.md` §1 and §2; it is not restated here. `ForeverFriendsDB.log` holds the last 50
-lines (`/dump ForeverFriendsDB.log`). When the client will not give a value (nil, or a secret
-value), the field keeps what it had; an entry without name, realm and class is not created.
+lines (`/dump ForeverFriendsDB.log`).
 
 ## Verify in client
 

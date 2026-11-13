@@ -215,7 +215,7 @@ describe("ForeverFriends Core (simulated client)", function()
             assert.are.equal("ForeverFriends: Anna: Thrallina (Shaman 23, main)", wow.printed[1])
             wow.printed = {}
             wow.slash("FOREVERFRIENDS", "status")
-            assert.are.equal("ForeverFriends: 1 characters recorded, this one is Thrallina-TestRealm.", wow.printed[1])
+            assert.are.equal("ForeverFriends: 1 character recorded, this one is Thrallina-TestRealm.", wow.printed[1])
         end)
 
         it("answers no list yet without the data addon and for its empty first file", function()
