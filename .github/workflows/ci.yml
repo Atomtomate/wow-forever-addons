@@ -8,10 +8,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: leafo/gh-actions-lua@v10
-        with:
-          luaVersion: "5.1"
-      - uses: leafo/gh-actions-luarocks@v4
-      - run: luarocks install luacheck && luarocks install busted
+      # Ubuntu's own packages, not a download of the Lua source: an action that fetches it failed
+      # on connection resets. LuaRocks puts luacheck and busted in /usr/local/bin with a wrapper
+      # that runs them under lua5.1, so .busted needs no interpreter pin.
+      - name: Lua 5.1, LuaRocks, luacheck, busted
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.1 liblua5.1-0-dev luarocks
+          sudo luarocks --lua-version 5.1 install luacheck
+          sudo luarocks --lua-version 5.1 install busted
       - run: luacheck addons spec --no-cache
       - run: busted --output=plainTerminal

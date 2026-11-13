@@ -1,0 +1,12 @@
+## Interface: 16001
+## Title: Forever Friends
+## Notes: Records the character you play for the group's hub and shows the member list with /ff. Reads only.
+## Author: Forever Friends
+## Version: 0.1.0
+## OptionalDeps: ForeverFriendsData
+## SavedVariables: ForeverFriendsDB
+
+Snapshot.lua
+Roster.lua
+Lines.lua
+Core.lua

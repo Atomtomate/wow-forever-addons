@@ -2,7 +2,13 @@
 
 Addons for a small friend group playing **World of Warcraft: Forever**, developed with an AI
 assistant in the loop. Each addon lives under `addons/<Name>/`; lint, tests and the feedback
-loop are shared. The first is **MarketScan**, which records auction-house prices.
+loop are shared.
+
+- **ForeverFriends** links the game to the group's site (the hub): it records the character
+  being played and shows who is whose character. A small **companion** program on each
+  member's PC installs it and carries the data, because an addon cannot reach the network
+  (`docs/DECISIONS.md` D6 to D8, formats in `docs/CONTRACT.md`).
+- **MarketScan** records auction-house prices. Merged, not yet run in the client.
 
 ## Facts that shape everything (verified 2026-11-09, see `docs/RESEARCH.md`)
 
@@ -18,6 +24,7 @@ loop are shared. The first is **MarketScan**, which records auction-house prices
 | Path | What |
 |---|---|
 | `addons/<Name>/` | one addon: `<Name>.toc`, Lua files, `spec/` with its busted tests |
+| `docs/CONTRACT.md` | the formats the addon, the companion and the hub exchange; their only home |
 | `spec/support/wow.lua` | a small simulated client for busted: frames, events, timers, SavedVariables |
 | `tools/link.ps1` | Windows: directory junction from the game's AddOns folder into this checkout |
 | `tools/pull_sv.ps1` | Windows: copy an addon's SavedVariables file into `data/` after a `/reload` |
