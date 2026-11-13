@@ -29,14 +29,16 @@ type Skill struct {
 	Max  int `json:"max"`
 }
 
-// Character is one entry of the upload.
+// Character is one entry of the upload. Skills is nil, and so left out of the body, unless the
+// addon's entry has at least one usable line: the hub replaces a character's professions with
+// whatever a present `skills` holds, an empty list included.
 type Character struct {
 	Name   string  `json:"name"`
 	Realm  string  `json:"realm"`
 	Class  string  `json:"class"`
 	Race   string  `json:"race,omitempty"`
 	Level  int     `json:"level,omitempty"`
-	Skills []Skill `json:"skills"`
+	Skills []Skill `json:"skills,omitempty"`
 	Seen   int64   `json:"seen"`
 }
 

@@ -130,7 +130,7 @@ func characters(top map[string]Value) (map[string]wire.Character, error) {
 		if name == "" || realm == "" || class == "" || len(name) > wire.MaxFieldBytes || len(realm) > wire.MaxFieldBytes || len(class) > wire.MaxFieldBytes {
 			continue
 		}
-		c := wire.Character{Name: name, Realm: realm, Class: class, Skills: []wire.Skill{}}
+		c := wire.Character{Name: name, Realm: realm, Class: class}
 		if r, ok := t.Get("race").(string); ok && len(r) <= wire.MaxFieldBytes {
 			c.Race = r
 		}

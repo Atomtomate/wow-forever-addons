@@ -273,3 +273,22 @@ func tableOf(m map[string]Value) *Table {
 	}
 	return t
 }
+
+// The hub replaces a character's professions with a `skills` that is present, even an empty one,
+// so an entry without usable skill lines must leave the field out of the body.
+func TestEntryWithoutSkillsSendsNoSkillsField(t *testing.T) {
+	for name, extra := range map[string]string{"no key": "", "empty table": "skills = {}", "no usable line": "skills = { { name = \"x\" }, \"junk\" }"} {
+		s := Read(fsWith(map[string]string{account("A"): db(ch("Thrall", "R", 5, extra))}, time.Unix(1, 0)))
+		if len(s.Characters) != 1 {
+			t.Fatalf("%s: %+v", name, s)
+		}
+		b, _ := json.Marshal(s.Characters[0])
+		if strings.Contains(string(b), "skills") || strings.Contains(string(b), "null") {
+			t.Errorf("%s: %s", name, b)
+		}
+	}
+	s := Read(fsWith(map[string]string{account("A"): db(ch("Thrall", "R", 5, "skills = { { id = 171, rank = 1, max = 75 } }"))}, time.Unix(1, 0)))
+	if b, _ := json.Marshal(s.Characters[0]); !strings.Contains(string(b), `"skills":[{"id":171`) {
+		t.Fatalf("%s", b)
+	}
+}
