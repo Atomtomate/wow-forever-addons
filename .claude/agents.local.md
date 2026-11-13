@@ -39,7 +39,8 @@ breaking for the other two parties: say so.
 - Go (the companion): standard library only (D7). `companion/` holds `package main` and stays
   thin; logic lives in packages under `companion/internal/` that do not import each other in
   a cycle and do not reach for the network, the clock or the file system except through what
-  the caller passes in, so they are tested without a PC. Code for one operating system sits in
+  the caller passes in, so they are tested without a PC. For writing files, a root directory
+  passed in counts as that (Go's `io/fs` is read-only), and a test runs in a temporary one. Code for one operating system sits in
   `_windows.go` / `_other.go` files behind one small function each.
 - There is no layering script. Read the imports.
 
