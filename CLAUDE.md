@@ -37,9 +37,18 @@ style applies here too (lightweight, decisions written down, the owner merges).
   on an unlisted global: list it in `.luacheckrc` or make it local.
 - What a test cannot prove is written into the addon's README as "Verify in client" and into
   `docs/HANDOFF.md`, with the exact `/dump` or `/run` line to try.
-- Draft PRs; the owner says merge. Ask before a new library dependency (Ace3 and the like, and
-  any Go module for the companion, which uses the standard library only), a SavedVariables
-  format change that loses data, or anything that automates play.
+- A pull request is a draft only while it is being worked on. Once CI is green and its reviews
+  are folded it is marked ready for review, which is what tells the owner to look; a stacked
+  one says "merge after #N" in its first line. The owner says merge.
+- **One session carries one pull request, from its brief to ready for review, then ends.** Work
+  is cut so that each piece finishes inside one session, and the next piece starts from this
+  file, `docs/HANDOFF.md` and the contract, not from a carried conversation. A piece that
+  cannot finish is committed, what is left goes into the pull request's body, and the session
+  stops. `.claude/settings.json` caps a context at 400,000 tokens; that is the backstop, not
+  the plan (the owner, 2026-11-13, after one session grew to 900,000).
+- Ask before a new library dependency (Ace3 and the like, and any Go module for the companion,
+  which uses the standard library only), a SavedVariables format change that loses data, or
+  anything that automates play.
 - **`docs/CONTRACT.md` is the one home of what the addon, the companion and the hub exchange**,
   and of what the companion may read and write on a PC (its §5). A change to a format changes
   it there first, and the other two parties in the same breath.

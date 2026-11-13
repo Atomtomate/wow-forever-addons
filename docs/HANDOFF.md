@@ -8,7 +8,7 @@ Read this after `CLAUDE.md`. Replace it when the next session closes.
   game. The owner then made the first addon the group installs **ForeverFriends**, the link
   between the game and the hub: members, their characters, online status (D6 to D8). Three
   programs build against one file, `docs/CONTRACT.md`.
-- **Open pull requests, all drafts, all green, none merged:**
+- **Open pull requests, all marked ready for review, all green, none merged:**
 
   | Pull request | What | Review pass |
   |---|---|---|
@@ -71,6 +71,12 @@ group has Mac and Linux players.
 
 ## How this session ran, for the next one
 
+- **Two corrections from the owner at the close; both are rules in `CLAUDE.md` now.** The
+  finished pull requests had all been left as drafts, so nothing told the owner what to review.
+  And one session ran every lane and every review in a single context that grew from 90,000 to
+  900,000 tokens: of the 150 million tokens it read, 89% were read above 400,000. One session
+  now carries one pull request, and `.claude/settings.json` caps a context at 400,000. For
+  several pieces, open one session per piece (a cloud session can open them itself).
 - The owner's agent fleet did the work: `impl-director` cut the plan, the direction and
   architecture reviewers read the plans before code, three specialists built in three
   worktrees, four reviewers read each pull request. `.claude/agents.local.md` (pull request #2)
