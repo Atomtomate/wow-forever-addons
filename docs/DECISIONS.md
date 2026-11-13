@@ -98,9 +98,8 @@ warns each member once. Windows is the supported platform for version one: setup
 and the background run are built for it. On macOS and Linux the same program builds and, started
 by hand, links the PC, uploads the characters and writes the member list. What those two lack
 in version one: no autostart on either; on macOS the program does not look for the game at all,
-so nobody shows as in game from a Mac, and no macOS file is published until someone needs one;
-on Linux a file is published, and whether the game is found when it runs under Wine is not
-known. (The plan's direction review, 2026-11-13, found these narrowings recorded only in review
+so nobody shows as in game from a Mac; on Linux whether the game is found when it runs under
+Wine is not known. Files are published for Windows, Linux and macOS. (The plan's direction review, 2026-11-13, found these narrowings recorded only in review
 files.) Asked whether anyone plays on a Mac, the owner answered the same day: "we have mac and
 linux users". So these two are not a footnote: finding the game on macOS and under Wine or
 Proton on Linux, a macOS download and autostart on both are the work right after version one
