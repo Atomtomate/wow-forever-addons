@@ -403,7 +403,9 @@ characters with class and level.
 
 Never: gold, play time, location, gear, guild notes, chat, anything about other players, and
 nothing else about the PC. The hub keeps `seen` only to order uploads (§4) and shows no "last
-seen" and no time of a sync or of a PC (its D10 and D15).
+seen" and no time of a sync or of a PC (its D10 and D15). The one time it does show is about
+itself: its Admin page lists when a stretch in which it could not be reached was reported and
+how long it lasted, without saying whose PC saw it.
 
 Of the game's files the companion reads one per account, `SavedVariables/ForeverFriends.lua`,
 and it writes only inside `Interface/AddOns/ForeverFriends` and
