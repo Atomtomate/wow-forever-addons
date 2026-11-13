@@ -37,7 +37,7 @@ ForeverFriendsDB = {
             class = "SHAMAN",               -- classFilename from UnitClass: the same in every locale
             race = "Orc",                   -- englishRaceName from UnitRace: the same in every locale
             level = 23,
-            skills = {                      -- every non-header line of C_SkillInfo, at most 40
+            skills = {                      -- non-header lines of C_SkillInfo in the client's order, the first 40
                 { id = 171, name = "Alchimie", rank = 145, max = 150 },
             },
             seen = 1763000000,              -- GetServerTime() when this entry was last refreshed
@@ -52,7 +52,11 @@ ForeverFriendsDB = {
   three parties cannot disagree about it. The localized `name` of a skill stays in this file
   for a person reading it; it is not sent (§3).
 - A value the client returns as `nil` or as a secret value is not written; the field keeps what
-  it had. An entry without `name`, `realm` and `class` is not created.
+  it had. An entry without `name`, `realm` and `class` is not created. An empty read of the
+  skill lines (a client that is not ready yet) keeps the old list.
+- The key is opaque: readers use the fields, never split the key.
+- A table the client loads back whose `version` the addon does not know is replaced by an empty
+  one; the characters come back as they are played.
 - The companion reads `version`, and `characters` with the fields above. It ignores `log` and
   any key it does not know. When the same key is in the files of two accounts, the entry with
   the newer `seen` wins. It must not assume a file lists every character: the client may not
@@ -66,6 +70,10 @@ ForeverFriendsDB = {
 The companion creates and owns the folder `<game>/Interface/AddOns/ForeverFriendsData/` and
 nothing in this repository lives there. ForeverFriends names it under `## OptionalDeps`, so the
 client loads it first when it exists, and the addon works without it.
+
+The companion writes the folder when it installs the addon, with a `Data.lua` of
+`members = {}` and `written = 0`, so that one restart of the game is enough for both folders;
+the addon treats an empty list as no list yet.
 
 `ForeverFriendsData.toc`, whose `## Interface` line is copied from the `ForeverFriends.toc` the
 companion carries, so that a client patch never marks one of the two out of date alone:
@@ -102,7 +110,9 @@ ForeverFriendsData = {
 - The file is replaced atomically (written beside it, then renamed) and only when its content
   would differ, `written` aside.
 - The addon treats the table as untrusted: it checks the type of every field it reads, skips
-  what does not fit, and never calls, loads or concatenates-and-runs anything from it.
+  what does not fit, and never calls, loads or concatenates-and-runs anything from it. Before
+  it shows a string it doubles every `|` and drops control characters, so a name cannot carry
+  one of the game's chat codes.
 - A folder that did not exist when the game started (the first install of either addon) is seen
   only after the game restarts. A changed `Data.lua` in a folder the game already knows is seen
   at the next login or `/reload` (verify in client).
@@ -131,7 +141,7 @@ the hub for a short code, and a member who is logged in on the hub approves that
 2. `POST /api/companion/link`, unsigned, body at most 4 KiB (else 413):
 
    ```json
-   { "v": 1, "companion": "0.1.0", "device_name": "JULIAN-PC", "public_key": "<base64 of the 32-byte public key>" }
+   { "v": 1, "device_name": "JULIAN-PC", "public_key": "<base64 of the 32-byte public key>" }
    ```
 
    Answer, 200:
@@ -142,8 +152,9 @@ the hub for a short code, and a member who is logged in on the hub approves that
    ```
 
    `device` (16 lowercase hex) is this PC's id from now on. `user_code` is eight letters from
-   `BCDFGHJKLMNPQRSTVWXZ`, shown as two groups of four. `device_name` is at most 40 characters;
-   the hub drops control characters from it. 400 for a malformed body, a key that is not 32
+   `BCDFGHJKLMNPQRSTVWXZ`, shown as two groups of four. `device_name` is cut to 40 characters;
+   the hub drops control, format and line-separator characters from it, and an empty result
+   becomes `PC`. 400 for a malformed body, a key that is not 32
    bytes, or a key the hub already holds. 429 when the limit is reached: at most 5 link starts
    from one address in 15 minutes and at most 20 pending links on the hub (an expired pending
    link is deleted, not counted); the companion says to try again later.
@@ -161,7 +172,8 @@ the hub for a short code, and a member who is logged in on the hub approves that
    `POST /api/companion/link/status` with body `{ "v": 1 }`. Answer:
    `{ "ok": true, "linked": false }`, or `{ "ok": true, "linked": true, "member": "Anna" }`.
    401 means the link expired or was declined; the companion starts over when the member asks.
-   Closed and reopened before the expiry, the companion shows the same code and goes on asking;
+   Any answer other than 200, 400 and 401 is asked again at the same interval until the
+   expiry. Closed and reopened before the expiry, the companion shows the same code and goes on asking;
    after it, it starts over. It registers its autostart only once `linked` is true.
 
 A member can link several PCs. Each appears on their hub profile by name and can be removed
@@ -169,7 +181,8 @@ there, which makes the hub answer that device with 401 from then on.
 
 `POST /api/companion/unlink` (signed, body `{ "v": 1 }`) removes the calling device, linked or
 still pending; the companion's own "remove" uses it before it deletes its key. Answer
-`{ "ok": true }`. `link/status` and `unlink` answer 400 `unsupported version` for another `v`,
+`{ "ok": true }`; 401 means the device is already gone, and the companion treats that as
+done. `link/status` and `unlink` answer 400 `unsupported version` for another `v`,
 as `sync` does.
 
 ### 3.2 Every other request is signed
@@ -216,9 +229,9 @@ private key seed   bytes 0x00 to 0x1f
 public key         A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=
 device, seq        0123456789abcdef, 7
 method, path       POST, /api/companion/sync
-body               {"v":1,"companion":"0.1.0","game_running":false}
-body SHA-256       3a518b21f09132d92e44deea92fbc5558754e4b38623aca38acc4198adc94d5b
-signature          yiX2+CgyX8c4SR7q0sMAEdMlFkKpiescDn+/9k8OLGWdP0Bmdqsz9AWo5rIKK892Gf0FBTTlbqGmMceT8G5eCg==
+body               {"v":1,"game_running":false}
+body SHA-256       637ea0ebc551e160c01667d569224ec68d187f006cb574458cbddef68177bc92
+signature          /ugHnkaZUd3KLobU7MuwmJfVZHMDdseFQ0WO5IjfJh0xvHvEWIB8dSWXhpVvPBcxaPCGbtg1srH1wV8UNAsUCw==
 ```
 
 ### 3.3 The sync request
@@ -229,7 +242,6 @@ signature          yiX2+CgyX8c4SR7q0sMAEdMlFkKpiescDn+/9k8OLGWdP0Bmdqsz9AWo5rIKK
 ```json
 {
   "v": 1,
-  "companion": "0.1.0",
   "game_running": true,
   "characters": [
     { "name": "Thrallina", "realm": "Everlook", "class": "SHAMAN", "race": "Orc", "level": 23,
@@ -244,7 +256,6 @@ signature          yiX2+CgyX8c4SR7q0sMAEdMlFkKpiescDn+/9k8OLGWdP0Bmdqsz9AWo5rIKK
 | Field | Required | Meaning |
 |---|---|---|
 | `v` | yes | `1`. The hub answers any other value with 400 `unsupported version`. |
-| `companion` | yes | the companion's version, at most 20 characters |
 | `game_running` | yes | whether a process of this game installation is running right now |
 | `characters` | no | sent when a SavedVariables file changed since the last sync the hub answered with 200, and always on the first sync after linking: the merged entries of every account on this PC, as §1 has them, without the skills' names |
 | `outage` | no | sent once, on the first success after at least two consecutive failed requests: `from` is the first failure, `to` this request, both the companion's clock in UTC |
@@ -268,15 +279,20 @@ Answer, 200:
 | Field | Meaning |
 |---|---|
 | `member` | the display name the device is linked to |
-| `accepted` | how many of the uploaded characters the hub stored; absent when none were sent |
-| `ignored` | at most 10 uploaded characters the hub did not store, each with a reason |
+| `accepted` | how many of the uploaded characters the hub stored |
+| `ignored` | at most 10 uploaded characters the hub did not store, each with a reason; `[]` when there are none |
 | `roster_etag` | 16 lowercase hex naming the current member list; it changes exactly when the list does |
 | `roster` | the member list, omitted when the request's `roster_etag` already names it |
 
-The member list holds every account on the hub. `name` is the display name, or the username
-when that is empty. A member's characters come main first, then by name. `class` is the hub's
-name (`Shaman`); `level` is left out when the hub does not know it and `main` when it is false.
-Real names, BattleTags and everything else on a profile stay on the hub.
+`accepted` and `ignored` are present exactly when the request carried `characters`.
+
+The member list holds every account on the hub, in order of name. `name` is the display name,
+or the username when that is empty. A member's characters come main first, then by name.
+`class` is the hub's name (`Shaman`); `level` is left out when the hub does not know it and
+`main` when it is false. A member's name is at most 160 bytes, a character's at most 64, and a
+member has at most 60 characters; a reader skips an entry outside these bounds and keeps the
+rest, and refuses the list only when its shape is wrong. Real names, BattleTags and everything
+else on a profile stay on the hub.
 
 Other answers:
 
@@ -286,7 +302,7 @@ Other answers:
 | 401 | unknown or not yet linked device, bad signature or header, or the device was removed on the profile | stops syncing and says this PC is no longer linked; linking again starts it |
 | 409 | stale sequence (§3.2) | continues from the returned number and sends again |
 | 413 | body over 128 KiB | as 400 |
-| 429 | something in front of the hub asks for less; the hub itself sets no limit on a signed request | waits 300 s |
+| 429 | something in front of the hub asks for less; the hub itself sets no limit on a signed request | waits 300 s; neither a failed request nor a success, so it does not start or end an outage |
 | 5xx, no answer, TLS failure, anything else | the hub is not reachable | counts a failed request, keeps the upload for the next try |
 
 What does not make a request fail: a character that breaks a limit (a string over 64 bytes, a
@@ -300,6 +316,9 @@ longer than 64 bytes. The hub stores an outage with its own receive time and dro
 
 Timing: one sync every 60 s while the game runs, every 300 s while it does not, and one at once
 when the game starts or exits; the companion looks for the game's process at least every 15 s.
+After a failed request it tries again sooner, at most every 30 s. After the companion resumes
+from sleep, failures in its first 60 s are not counted: a laptop's own network coming back is
+not the hub being down.
 The hub shows a member as in game while any of their devices' last sync with
 `game_running: true` is younger than 150 s, and stops at once on a sync from that device that
 says `false`.
@@ -319,11 +338,15 @@ implemented is the hub's (`wow-forever-hub`, `docs/DECISIONS.md` D17).
   matched character is the main, the profile's main class and race follow it, as they do on
   the site.
 - `realm` is read and not stored, so two characters of one name on two realms are one
-  character on the hub.
+  character on the hub: of several entries with one name in one upload, the one with the
+  newest `seen` is used and the others are ignored with the reason `same name`.
+- A member holds at most 60 characters; a new one beyond that is ignored with the reason
+  `too many characters`.
 - A character missing from an upload is left alone. Nothing is ever deleted by a sync.
 - `class` is mapped from the client's token; an unknown token means the character is ignored
   with a reason. `race` is mapped likewise; an unknown token, or one whose class the hub's
-  race and class table does not allow, leaves the race empty.
+  race and class table does not allow, does not set a race: a new character gets none, a
+  matched one keeps its own.
 - A skill line is a profession when its `id` is in the table below; other lines are dropped. A
   `rank` outside 1 to 300 is stored without a rank.
 
