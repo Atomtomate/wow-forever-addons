@@ -86,6 +86,43 @@ function wow.reset()
     end
     _G.SlashCmdList = {}
     _G.MarketScanDB, _G.AuctionHouseFrame = nil, nil
+
+    -- The player and the skill list, as the client's own documentation shapes them. Any field may be
+    -- replaced by wow.secret(); wow.restrictIdentity() does it for the three identity fields.
+    wow.player = {
+        name = "Thrallina", className = "Shaman", class = "SHAMAN", raceName = "Orc", race = "Orc", level = 23,
+    }
+    wow.skills, wow.skillCount, wow.identityRestricted = {}, nil, false
+    _G.UnitName = function() return wow.player.name end
+    _G.UnitClass = function() return wow.player.className, wow.player.class, 7 end
+    _G.UnitRace = function() return wow.player.raceName, wow.player.race, 2 end
+    _G.UnitLevel = function() return wow.player.level end
+    _G.C_SkillInfo = {
+        GetNumSkillLines = function() return wow.skillCount or #wow.skills end,
+        GetSkillLineInfo = function(index) return wow.skills[index] end,
+    }
+    -- identityRestricted is true, false, or "error" for a predicate that raises.
+    _G.C_Secrets = {
+        ShouldUnitIdentityBeSecret = function()
+            if wow.identityRestricted == "error" then error("predicate failed") end
+            return wow.identityRestricted
+        end,
+    }
+    _G.ForeverFriendsDB, _G.ForeverFriendsData = nil, nil
+    _G.SLASH_FOREVERFRIENDS1, _G.SLASH_FOREVERFRIENDS2 = nil, nil
+end
+
+-- Identity is restricted: the predicate says so and the three identity returns are secret values.
+function wow.restrictIdentity()
+    wow.identityRestricted = true
+    for _, field in ipairs({ "name", "className", "class", "raceName", "race" }) do
+        wow.player[field] = wow.secret()
+    end
+end
+
+-- One skill line as C_SkillInfo.GetSkillLineInfo returns it.
+function wow.skill(id, rank, max, isHeader)
+    return { skillID = id, name = "Skill", isHeader = isHeader or false, rank = rank, maxRank = max }
 end
 
 -- Sends an event to every frame that registered for it, in creation order.

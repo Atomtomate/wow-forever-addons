@@ -12,7 +12,8 @@ read_globals = {
     -- time and build
     "GetServerTime", "GetTime", "GetBuildInfo", "date", "time",
     -- player and realm
-    "GetRealmName", "UnitName", "UnitFullName", "GetNormalizedRealmName",
+    "GetRealmName", "UnitName", "UnitFullName", "GetNormalizedRealmName", "UnitClass", "UnitRace", "UnitLevel",
+    "C_Secrets", "C_SkillInfo",
     -- items and money
     "C_Item", "GetCoinTextureString", "C_CurrencyInfo",
     -- auction house (read-only calls only; D5)
@@ -29,6 +30,14 @@ files["addons/MarketScan/**"] = {
     globals = { "MarketScanDB", "SLASH_MARKETSCAN1", "SLASH_MARKETSCAN2", SlashCmdList = { fields = { "MARKETSCAN" } } },
 }
 
+files["addons/ForeverFriends/**"] = {
+    globals = {
+        "ForeverFriendsDB", "SLASH_FOREVERFRIENDS1", "SLASH_FOREVERFRIENDS2",
+        SlashCmdList = { fields = { "FOREVERFRIENDS" } },
+    },
+    read_globals = { "ForeverFriendsData" },
+}
+
 files["spec/**"] = {
     std = "+busted",
     globals = { "_G" },
@@ -37,6 +46,9 @@ files["spec/**"] = {
 
 files["addons/*/spec/**"] = {
     std = "+busted",
-    globals = { "_G", "SLASH_MARKETSCAN1", "SLASH_MARKETSCAN2", "MarketScanDB", "AuctionHouseFrame" },
+    globals = {
+        "_G", "SLASH_MARKETSCAN1", "SLASH_MARKETSCAN2", "MarketScanDB", "AuctionHouseFrame",
+        "ForeverFriendsDB", "ForeverFriendsData", "SLASH_FOREVERFRIENDS1", "SLASH_FOREVERFRIENDS2",
+    },
     ignore = { "122" },
 }
