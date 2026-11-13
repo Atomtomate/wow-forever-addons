@@ -3,6 +3,15 @@
 # Skips with a note when the toolchain is not installed, so a docs-only machine can commit.
 root=$(git rev-parse --show-toplevel) || exit 0
 cd "$root" || exit 0
+if git diff --cached --name-only | grep -qE '\.go$|^go\.mod$'; then
+    if command -v go >/dev/null; then
+        test -z "$(gofmt -l .)" || { echo "pre-commit: gofmt needed:"; gofmt -l .; exit 1; }
+        go vet ./... || exit 1
+        go test ./... || exit 1
+    else
+        echo "pre-commit: go not installed, Go checks skipped"
+    fi
+fi
 command -v luacheck >/dev/null || { echo "pre-commit: luacheck not installed, lint skipped"; exit 0; }
 luacheck addons spec --no-cache -q || exit 1
 busted --version >/dev/null 2>&1 || { echo "pre-commit: busted not working, tests skipped"; exit 0; }
