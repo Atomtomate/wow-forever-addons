@@ -110,8 +110,11 @@ ForeverFriendsData = {
 ## 3. Companion and hub
 
 The companion talks to four routes under `<hub>/api/companion/`. All take and answer JSON. The
-hub's base URL must be `https://`; the companion refuses anything else except a loopback host,
-which is how the hub is tested. The companion never follows a redirect.
+hub's address is an origin, `https://host[:port]`, with no path, query or fragment: the path a
+request is signed with (§3.2) must be the path the hub sees. The companion refuses any other
+scheme except `http` on a loopback host, which is how the hub is tested. The companion never
+follows a redirect. Binary values (`public_key`, `X-FF-Signature`) are standard base64 with
+padding (RFC 4648 §4).
 
 A failure answer is always `{ "ok": false, "error": "<one sentence>" }` with a status. Any
 status this section does not name, any redirect, and a 200 whose body is not JSON with
@@ -122,9 +125,10 @@ status this section does not name, any redirect, and a 200 whose body is not JSO
 The companion never sees a password and no person ever sees a secret. It makes a key pair, asks
 the hub for a short code, and a member who is logged in on the hub approves that code.
 
-1. The companion creates an Ed25519 key pair and keeps the private key in its own config
-   folder, readable by that user only. The private key never leaves the PC.
-2. `POST /api/companion/link`, unsigned:
+1. The companion creates a new Ed25519 key pair for every link it starts and keeps the private
+   key in its own config folder, readable by that user only. The private key never leaves the
+   PC.
+2. `POST /api/companion/link`, unsigned, body at most 4 KiB (else 413):
 
    ```json
    { "v": 1, "companion": "0.1.0", "device_name": "JULIAN-PC", "public_key": "<base64 of the 32-byte public key>" }
@@ -134,28 +138,39 @@ the hub for a short code, and a member who is logged in on the hub approves that
 
    ```json
    { "ok": true, "device": "3f9c2a71d05b88e4", "user_code": "WXYZ-BCDF",
-     "verify_url": "https://hub.example/companion/link?code=WXYZ-BCDF",
      "expires_in": 600, "interval": 5 }
    ```
 
    `device` (16 lowercase hex) is this PC's id from now on. `user_code` is eight letters from
    `BCDFGHJKLMNPQRSTVWXZ`, shown as two groups of four. `device_name` is at most 40 characters;
-   the hub drops control characters from it. 400 for a malformed body or a key that is not 32
-   bytes; 429 when one address starts too many links or too many are pending.
-3. The companion shows the code and `verify_url` and opens that page in the browser. The member,
-   logged in on the hub, sees the PC's name and the code and presses Link (a form of the hub's
-   own, with its session and CSRF check). A link that is not approved within `expires_in`
-   seconds is forgotten.
+   the hub drops control characters from it. 400 for a malformed body, a key that is not 32
+   bytes, or a key the hub already holds. 429 when the limit is reached: at most 5 link starts
+   from one address in 15 minutes and at most 20 pending links on the hub (an expired pending
+   link is deleted, not counted); the companion says to try again later.
+3. The companion stores the device id, the key, the code and the expiry in its config, then
+   shows the code and opens `<hub address>/companion/link?code=<user_code>` in the browser. It
+   builds that address itself; the hub does not name a page for it to open. The member, logged
+   in on the hub, sees the PC's name, the code and the line "Press Link only if this code is
+   shown by the companion on your own PC", with a Link and a Decline button (a form of the
+   hub's own, with its session and CSRF check). The hub links only a pending, unexpired device
+   whose code matches, read in either case and with or without the dash or spaces; a code
+   already used or expired gets a plain message; Decline deletes the pending device. A member
+   who is not logged in comes back to the same code after logging in. A link that is not
+   approved within `expires_in` seconds is forgotten.
 4. Meanwhile the companion asks every `interval` seconds, signed as in §3.2:
    `POST /api/companion/link/status` with body `{ "v": 1 }`. Answer:
    `{ "ok": true, "linked": false }`, or `{ "ok": true, "linked": true, "member": "Anna" }`.
    401 means the link expired or was declined; the companion starts over when the member asks.
+   Closed and reopened before the expiry, the companion shows the same code and goes on asking;
+   after it, it starts over. It registers its autostart only once `linked` is true.
 
 A member can link several PCs. Each appears on their hub profile by name and can be removed
 there, which makes the hub answer that device with 401 from then on.
 
-`POST /api/companion/unlink` (signed, body `{ "v": 1 }`) removes the calling device; the
-companion's own "remove" uses it before it deletes its key. Answer `{ "ok": true }`.
+`POST /api/companion/unlink` (signed, body `{ "v": 1 }`) removes the calling device, linked or
+still pending; the companion's own "remove" uses it before it deletes its key. Answer
+`{ "ok": true }`. `link/status` and `unlink` answer 400 `unsupported version` for another `v`,
+as `sync` does.
 
 ### 3.2 Every other request is signed
 
@@ -163,9 +178,11 @@ Three headers:
 
 | Header | Value |
 |---|---|
-| `X-FF-Device` | the device id from §3.1 |
-| `X-FF-Seq` | a positive integer, greater than every one the hub has accepted from this device |
+| `X-FF-Device` | the device id from §3.1: 16 lowercase hex |
+| `X-FF-Seq` | a positive integer, greater than every one the hub has accepted from this device, written in decimal digits only: no sign, no leading zero, at most 15 digits |
 | `X-FF-Signature` | base64 of the 64-byte Ed25519 signature |
+
+A missing or malformed header is answered 401.
 
 The signature is over these bytes (UTF-8, `\n` is one line feed, no trailing one), where the
 path is the request path without a query and the hash is over the body exactly as sent:
@@ -174,13 +191,19 @@ path is the request path without a query and the hash is over the body exactly a
 FF1\n<METHOD>\n<PATH>\n<device id>\n<seq>\n<lowercase hex SHA-256 of the body>
 ```
 
-The hub checks, in this order and before it looks at the body: the device exists (else 401),
-the signature verifies against that device's public key (else 401), the sequence number is
-greater than the last one accepted (else 409, `{ "ok": false, "error": "stale sequence",
-"seq": <last accepted> }`). A request that passes all three uses up its sequence number
-whatever the body turns out to hold. The companion uses a new number for every request it
-sends, answered or not; on 409 it continues from the returned number plus one and sends again.
-There is no clock in this: a PC whose time is wrong still links and syncs.
+The hub reads the raw body (within the route's size limit, else 413 first), hashes exactly
+those bytes, and checks in this order, parsing the JSON only afterwards: the device exists
+(else 401; a pending device past its expiry does not exist), the signature verifies against
+that device's public key (else 401), the sequence number is greater than the last one accepted
+(else 409, `{ "ok": false, "error": "stale sequence", "seq": <last accepted> }`). The hub
+accepts a number with one atomic update, so two requests with the same number cannot both
+pass. A request that passes all three uses up its sequence number whatever the body turns out
+to hold.
+
+The companion sends one request at a time, stores the next number before it sends, and uses a
+new number for every request, answered or not. On 409 it continues from the returned number
+plus one and sends again once; a second 409 in a row counts as a failed request. There is no
+clock in this: a PC whose time is wrong still links and syncs.
 
 What this buys: the hub stores public keys only, so a copy of its database cannot act as any
 device; a recorded request cannot be sent twice; and the key works for these routes only, never
@@ -260,7 +283,7 @@ Other answers:
 | Status | When | The companion |
 |---|---|---|
 | 400 | the body is not JSON, a required field is missing or of the wrong type, `characters` is not an array or holds more than 50 | marks the files it sent as uploaded, logs the error, keeps its schedule |
-| 401 | unknown device, bad signature, or the device was removed on the profile | stops syncing and says this PC is no longer linked; linking again starts it |
+| 401 | unknown or not yet linked device, bad signature or header, or the device was removed on the profile | stops syncing and says this PC is no longer linked; linking again starts it |
 | 409 | stale sequence (§3.2) | continues from the returned number and sends again |
 | 413 | body over 128 KiB | as 400 |
 | 429 | something in front of the hub asks for less; the hub itself sets no limit on a signed request | waits 300 s |
@@ -330,8 +353,10 @@ that Forever uses the same is **not verified** until the first run in the client
 
 ## 5. What never crosses
 
-Gold, play time, location, gear, guild notes, chat, anything about other players. The hub shows
-no "last seen" and no time of a sync (its D10 and D15). Inside the game folder the companion
+Gold, play time, location, gear, guild notes, chat, anything about other players. Beside the
+characters and the running flag, the hub learns the PC's name and its public key when it is
+linked, and nothing else about the PC. The hub shows no "last seen" and no time of a sync (its
+D10 and D15). Inside the game folder the companion
 reads one file per account, `SavedVariables/ForeverFriends.lua`, and writes only inside
 `Interface/AddOns/ForeverFriends` and `Interface/AddOns/ForeverFriendsData`. Outside it, it
 keeps its own config folder (the key, the hub's address, its state and a small log), its own

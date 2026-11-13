@@ -129,4 +129,5 @@ it. The rules that shape them:
   only the public key; each request carries a signature and a rising sequence number
   (`docs/CONTRACT.md` §3.1, §3.2). No person ever sees a secret, the hub's database holds none,
   a recorded request cannot be sent twice, and a PC is cut off from the member's profile. The
-  member list goes only to PCs linked this way.
+  member list goes only to PCs linked this way. Linking adds two things to what reaches the
+  hub: the PC's name, so the member can tell their PCs apart, and its public key.
