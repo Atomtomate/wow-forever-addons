@@ -66,13 +66,14 @@ describe("ForeverFriends Core (simulated client)", function()
         assert.are.equal(25, ForeverFriendsDB.characters["Thrallina-TestRealm"].level)
     end)
 
-    it("reads the skills once, two seconds after a burst of SKILL_LINES_CHANGED", function()
+    it("reads the skills once, after a two second delay, for a burst of SKILL_LINES_CHANGED", function()
         wow.fire("PLAYER_LOGIN")
         local reads = 0
         local original = C_SkillInfo.GetNumSkillLines
         C_SkillInfo.GetNumSkillLines = function() reads = reads + 1 return original() end
         wow.skills = { wow.skill(171, 150, 150) }
         for _ = 1, 20 do wow.fire("SKILL_LINES_CHANGED") end
+        assert.are.same({ 2 }, wow.delays)
         assert.are.equal(0, reads)
         assert.are.equal(1, wow.tick())
         assert.are.equal(1, reads)
@@ -92,7 +93,7 @@ describe("ForeverFriends Core (simulated client)", function()
         assert.are.equal("logout", lastLog():match("logout$"))
     end)
 
-    it("records nothing and logs once while identity is secret, keeping the old entry", function()
+    it("moves only the level while identity is secret, and logs that once", function()
         wow.fire("PLAYER_LOGIN")
         local before = ForeverFriendsDB.characters["Thrallina-TestRealm"]
         wow.restrictIdentity()
@@ -104,6 +105,7 @@ describe("ForeverFriends Core (simulated client)", function()
         assert.are.equal("Orc", entry.race)
         assert.are.equal(24, entry.level) -- level is not identity; the session still knows who this is
         assert.are.equal(before.seen, entry.seen)
+        assert.are.equal(1, #entry.skills)
         local n = 0
         for _, line in ipairs(ForeverFriendsDB.log) do
             if line:match("identity is secret") then n = n + 1 end
@@ -144,6 +146,32 @@ describe("ForeverFriends Core (simulated client)", function()
         wow.skills = {}
         wow.fire("PLAYER_LOGOUT")
         assert.are.equal(171, ForeverFriendsDB.characters["Thrallina-TestRealm"].skills[1].id)
+    end)
+
+    it("keeps the whole old list when one skill line cannot be read", function()
+        wow.fire("PLAYER_LOGIN")
+        wow.skills = { wow.skill(171, 150, 150), wow.skill(164, wow.secret(), 75) }
+        wow.fire("PLAYER_LOGOUT")
+        local skills = ForeverFriendsDB.characters["Thrallina-TestRealm"].skills
+        assert.are.equal(1, #skills)
+        assert.are.equal(145, skills[1].rank)
+    end)
+
+    it("does not move seen on a read in which the name was secret", function()
+        wow.fire("PLAYER_LOGIN")
+        local seen = ForeverFriendsDB.characters["Thrallina-TestRealm"].seen
+        wow.time = wow.time + 100
+        wow.player.name = wow.secret()
+        wow.fire("PLAYER_LOGOUT")
+        assert.are.equal(seen, ForeverFriendsDB.characters["Thrallina-TestRealm"].seen)
+    end)
+
+    it("survives a secret skill name and a secret level-up argument", function()
+        wow.skills = { wow.skill(171, 145, 150) }
+        wow.skills[1].name = wow.secret()
+        wow.fire("PLAYER_LOGIN")
+        assert.are.equal("", ForeverFriendsDB.characters["Thrallina-TestRealm"].skills[1].name)
+        assert.has_no.errors(function() wow.fire("PLAYER_LEVEL_UP", wow.secret()) end)
     end)
 
     it("keeps the first 40 of 60 skill lines and logs the cut once", function()
@@ -187,7 +215,7 @@ describe("ForeverFriends Core (simulated client)", function()
             assert.are.equal("ForeverFriends: Anna: Thrallina (Shaman 23, main)", wow.printed[1])
             wow.printed = {}
             wow.slash("FOREVERFRIENDS", "status")
-            assert.are.equal("ForeverFriends: 1 characters recorded, this one is Thrallina-TestRealm.", wow.printed[1])
+            assert.are.equal("ForeverFriends: 1 character recorded, this one is Thrallina-TestRealm.", wow.printed[1])
         end)
 
         it("answers no list yet without the data addon and for its empty first file", function()

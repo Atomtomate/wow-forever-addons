@@ -7,7 +7,6 @@ local MAX_MEMBERS = 100
 local MAX_CHARACTERS = 60 -- the hub's own cap per member
 local MAX_MEMBER_NAME = 160 -- bytes: a 40-character display name in UTF-8
 local MAX_CHARACTER_NAME = 64
-local MAX_LEVEL = 120
 
 local function text(value, max)
     if type(value) == "string" and #value >= 1 and #value <= max then
@@ -16,7 +15,7 @@ local function text(value, max)
 end
 
 local function level(value)
-    if type(value) == "number" and value == math.floor(value) and value >= 1 and value <= MAX_LEVEL then
+    if type(value) == "number" and value == math.floor(value) and value >= 1 and value ~= math.huge then
         return value
     end
 end
@@ -76,17 +75,14 @@ local function read(data)
 end
 
 -- Returns the members as plain tables, or nil and why: "missing" (no data addon), "version" (not a
--- table, or a version this addon does not know), "unreadable", "empty" (the companion's first file, or
--- nothing readable in it: the same as no list yet). Never raises, whatever the table holds.
+-- table, or a version this addon does not know), "unreadable", "empty" (the companion's first file,
+-- or nothing readable in it: the same as no list yet). Raises on nothing a table can hold, because
+-- it only type-checks and rawgets.
 function ns.readRoster(data)
     if data == nil then
         return nil, "missing"
     end
-    local ok, members, reason = pcall(read, data)
-    if not ok then
-        return nil, "unreadable"
-    end
-    return members, reason
+    return read(data)
 end
 
 function ns.countCharacters(members)

@@ -72,14 +72,14 @@ describe("ForeverFriends Roster (pure)", function()
         assert.are.equal(64, #members[1].characters[1].name)
     end)
 
-    it("keeps only whole levels from 1 to 120 and main only when true", function()
+    it("keeps only positive whole levels and main only when true", function()
         local function level(v)
             local members = ns.readRoster(data({ { name = "A", characters = { { name = "C", level = v } } } }))
             return members[1].characters[1].level
         end
         assert.are.equal(1, level(1))
-        assert.are.equal(120, level(120))
-        for _, bad in ipairs({ 0, 121, 1e9, 1.5, 0 / 0, math.huge, "5", true }) do
+        assert.are.equal(1e9, level(1e9))
+        for _, bad in ipairs({ 0, -3, 1.5, 0 / 0, math.huge, "5", true }) do
             assert.is_nil(level(bad))
         end
         local m = ns.readRoster(data({ { name = "A", characters = { { name = "C", main = true } } } }))

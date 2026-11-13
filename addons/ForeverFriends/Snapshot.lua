@@ -1,26 +1,24 @@
 -- Pure part: turns what the client returned into the entry of docs/CONTRACT.md §1. No client
--- globals, so busted loads it alone. The client decides nothing here; a value that cannot be used
--- is simply not written and the field keeps what it had.
+-- globals (the lint enforces it), so busted loads it alone. A value that cannot be used is simply
+-- not written and the field keeps what it had.
 local _, ns = ...
 
 ns.MAX_SKILLS = 40
 ns.MAX_LOG = 50
 
 -- Returns v when it is a usable value of the kind ("string", "level" >= 1, "count" >= 0), else nil.
--- The probe runs first, under pcall, and type() only afterwards: a secret string reports the type
--- "string", so type() cannot tell it apart. Concatenating a secret may be allowed and yield another
--- secret; comparing one is what raises, so the string probe compares the concatenation with v.
+-- A client value is never compared outside a pcall: comparing a secret raises, nil included, and
+-- nil needs no test of its own because the probe raises on it too. The probe runs before type()
+-- because a secret string reports the type "string". Concatenating a secret may be allowed and
+-- yield another secret; comparing one is what raises, so the probe compares the result with v.
 function ns.usable(v, kind)
-    if v == nil then
-        return nil
-    end
     local ok, same
     if kind == "string" then
         ok, same = pcall(function() return (v .. "") == v end)
-        if not (ok and same and type(v) == "string" and v ~= "") then
-            return nil
+        if ok and same and type(v) == "string" and v ~= "" then
+            return v
         end
-        return v
+        return nil
     end
     ok, same = pcall(function() return v + 0 == v and v == v end)
     if not (ok and same and type(v) == "number" and v ~= math.huge and v ~= -math.huge) then
@@ -32,67 +30,75 @@ function ns.usable(v, kind)
     return v
 end
 
-local IDENTITY_FIELDS = { "name", "realm", "class", "race" }
-
--- Merges one read into the character's old entry. `read` holds the raw client values (name, realm,
--- class, race, level) and `skills`, an already collected list or nil. Returns key, entry, or nil
--- when there is nothing to write: no usable name and realm to key it by, or no class to say who it
--- is. `seen` moves only when this read named the character completely.
-function ns.buildEntry(old, read, now)
+-- Merges one read into the character's entry in `characters` and returns key, entry, or nil when
+-- there is nothing to write. `read` holds the raw client values (name, realm, class, race, level)
+-- and `skills`, a list from collectSkills or nil. `remembered` ({ name, realm } or nil) names the
+-- character the session already knew, for a read in which the client would not give the name now.
+-- This is the only place the key is spelled and the old entry is found. `seen` moves only on a read
+-- in which the client gave name, realm and class (contract §1).
+function ns.buildEntry(characters, read, now, remembered)
     local name, realm = ns.usable(read.name, "string"), ns.usable(read.realm, "string")
+    local named = name and realm
+    if not named then
+        name, realm = remembered and remembered.name, remembered and remembered.realm
+    end
     if not (name and realm) then
         return nil
     end
+    local key = name .. "-" .. realm
     local entry = {}
-    for k, v in pairs(old or {}) do
+    for k, v in pairs(characters[key] or {}) do
         entry[k] = v
     end
-    for _, field in ipairs(IDENTITY_FIELDS) do
-        entry[field] = ns.usable(read[field], "string") or entry[field]
-    end
+    local class = ns.usable(read.class, "string")
+    entry.name, entry.realm = name, realm
+    entry.class = class or entry.class
+    entry.race = ns.usable(read.race, "string") or entry.race
     entry.level = ns.usable(read.level, "level") or entry.level
     entry.skills = read.skills or entry.skills
     if not entry.class then
         return nil
     end
-    if ns.usable(read.class, "string") and ns.usable(now, "count") then
+    if named and class and ns.usable(now, "count") then
         entry.seen = now
     end
-    return name .. "-" .. realm, entry
+    return key, entry
 end
 
 -- The non-header lines of the skill list in the client's order, the first MAX_SKILLS. `getLine(i)`
--- returns a table with skillID, name, isHeader, rank, maxRank. A line whose id, rank or maxRank is
--- unusable is dropped, never guessed. Returns the list and whether it was cut, or nil when there
--- is nothing to replace the old list with (count unusable or 0, every line dropped).
+-- returns a table with skillID, name, isHeader, rank, maxRank. Returns the list and whether it was
+-- cut, or nil, meaning "keep the old list": the count is unusable or 0 (a client not ready yet), or
+-- any line could not be used, since a list with one line missing makes the hub drop that profession.
 function ns.collectSkills(count, getLine)
     count = ns.usable(count, "count")
     if not count or count == 0 then
         return nil
     end
-    local skills, truncated = {}, false
+    local skills = {}
     for i = 1, count do
-        -- Everything about the line is read inside the pcall, the header test included: comparing a
-        -- secret raises on the real client.
+        -- Everything about the line is read inside the pcall, the header test included.
         local ok, id, name, header, rank, max = pcall(function()
             local t = getLine(i)
             return t.skillID, t.name, t.isHeader == true, t.rank, t.maxRank
         end)
-        if ok and not header then
-            id, rank, max = ns.usable(id, "count"), ns.usable(rank, "count"), ns.usable(max, "count")
-            if id and rank and max then
-                if #skills >= ns.MAX_SKILLS then
-                    truncated = true
-                    break
-                end
-                skills[#skills + 1] = { id = id, name = ns.usable(name, "string") or "", rank = rank, max = max }
+        if not ok then
+            return nil
+        end
+        if not header then
+            if #skills >= ns.MAX_SKILLS then
+                return skills, true
             end
+            id, rank, max = ns.usable(id, "count"), ns.usable(rank, "count"), ns.usable(max, "count")
+            if not (id and rank and max) then
+                return nil
+            end
+            skills[#skills + 1] = { id = id, name = ns.usable(name, "string") or "", rank = rank, max = max }
         end
     end
     if #skills == 0 then
         return nil
     end
-    return skills, truncated
+    return skills, false
 end
 
 -- Appends to the ring inside SavedVariables, so the log leaves the machine with the data.
@@ -103,31 +109,13 @@ function ns.pushLog(log, line)
     end
 end
 
--- A table the client loaded back is checked, not trusted. Anything of another version, or not a
--- table, is replaced by an empty one (contract §1); other characters are kept as they are.
+-- A table the client loaded back whose version this addon does not know, or that is not a table, is
+-- replaced by an empty one (contract §1). Otherwise it is kept, with the two tables made sure of.
 function ns.normalise(db)
     if type(db) ~= "table" or db.version ~= 1 then
         return { version = 1, characters = {}, log = {} }
     end
-    if type(db.characters) ~= "table" then
-        db.characters = {}
-    end
-    for key, entry in pairs(db.characters) do
-        if type(key) ~= "string" or type(entry) ~= "table" then
-            db.characters[key] = nil
-        end
-    end
-    local log = {}
-    if type(db.log) == "table" then
-        for _, line in ipairs(db.log) do
-            if type(line) == "string" then
-                log[#log + 1] = line
-            end
-        end
-    end
-    while #log > ns.MAX_LOG do
-        table.remove(log, 1)
-    end
-    db.log = log
+    db.characters = type(db.characters) == "table" and db.characters or {}
+    db.log = type(db.log) == "table" and db.log or {}
     return db
 end

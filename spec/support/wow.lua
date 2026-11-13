@@ -7,7 +7,10 @@ package.loaded["wow"] = wow
 local AH_FIELDS = 18 -- GetReplicateItemInfo returns 18 values
 
 -- A secret value: the real client raises when addon code does arithmetic, comparison or indexing
--- on one, so the stub raises on every such operation.
+-- on one. The stub raises on arithmetic and indexing; Lua 5.1 consults __eq and __lt only between two
+-- tables that share the handler, so a comparison with nil, a string, a number or a boolean does NOT
+-- raise here, and neither does type(). An addon that compares a client value must therefore do it
+-- inside a pcall and be tested with a secret that shares its handler (see snapshot_spec's probes).
 function wow.secret()
     local function boom()
         error("attempt to use a secret value", 2)
@@ -74,7 +77,13 @@ function wow.reset()
         wow.frames[#wow.frames + 1] = frame
         return frame
     end
-    _G.C_Timer = { After = function(_, fn) wow.timers[#wow.timers + 1] = fn end }
+    wow.delays = {} -- the delay of each C_Timer.After call, in order
+    _G.C_Timer = {
+        After = function(delay, fn)
+            wow.timers[#wow.timers + 1] = fn
+            wow.delays[#wow.delays + 1] = delay
+        end,
+    }
     _G.C_AuctionHouse = newAuctionHouse()
     _G.GetServerTime = function() return wow.time end
     _G.GetRealmName = function() return wow.realm end
@@ -92,13 +101,13 @@ function wow.reset()
     wow.player = {
         name = "Thrallina", className = "Shaman", class = "SHAMAN", raceName = "Orc", race = "Orc", level = 23,
     }
-    wow.skills, wow.skillCount, wow.identityRestricted = {}, nil, false
+    wow.skills, wow.identityRestricted = {}, false
     _G.UnitName = function() return wow.player.name end
     _G.UnitClass = function() return wow.player.className, wow.player.class, 7 end
     _G.UnitRace = function() return wow.player.raceName, wow.player.race, 2 end
     _G.UnitLevel = function() return wow.player.level end
     _G.C_SkillInfo = {
-        GetNumSkillLines = function() return wow.skillCount or #wow.skills end,
+        GetNumSkillLines = function() return #wow.skills end,
         GetSkillLineInfo = function(index) return wow.skills[index] end,
     }
     -- identityRestricted is true, false, or "error" for a predicate that raises.

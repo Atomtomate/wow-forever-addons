@@ -33,7 +33,7 @@ The durable backlog; entries are updated, never deleted. Status words: **next**,
 - **Price history and tooltips** — later. Needs the client to load SavedVariables back
   (`docs/RESEARCH.md` §1.3); until then every session starts empty.
 - **Prices on the hub** — later. Upload a scan summary to the Forever Friends hub so the group
-  sees prices on the site. The transport now exists (the companion, D7); needs a decision about
+  sees prices on the site. The transport would be the companion (D7); needs a decision about
   what the hub stores.
 - **Headless UI simulator in CI** — later. Osso/wow-ui-sim with the Forever profile, for load
   errors; D3 tier 2.

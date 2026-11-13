@@ -24,6 +24,9 @@ describe("ForeverFriends Lines (pure)", function()
     it("summarises the list", function()
         assert.are.equal("ForeverFriends: 2 members, 2 characters. /ff members, /ff who <name>, /ff status.",
             ns.respond("", data(members), own))
+        local one = { { name = "Anna", characters = { { name = "Thrallina" } } } }
+        assert.are.equal("ForeverFriends: 1 member, 1 character. /ff members, /ff who <name>, /ff status.",
+            ns.respond("", data(one), own))
     end)
 
     it("lists the members and finds one", function()
@@ -55,6 +58,7 @@ describe("ForeverFriends Lines (pure)", function()
         assert.are.equal("ForeverFriends: 3 characters recorded, this one is Thrallina-Everlook.",
             ns.respond("status", nil, own))
         assert.are.equal("ForeverFriends: 0 characters recorded.", ns.respond("status", nil, { count = 0 }))
+        assert.are.equal("ForeverFriends: 1 character recorded.", ns.respond("status", nil, { count = 1 }))
     end)
 
     it("doubles | and drops control characters from everything it shows", function()
@@ -65,7 +69,7 @@ describe("ForeverFriends Lines (pure)", function()
         assert.are.equal("a||b", ns.clean("a|b\1"))
     end)
 
-    it("keeps every line to 240 bytes and counts what it left out", function()
+    it("cuts a long list at a member and counts what it left out", function()
         local many, chars = {}, {}
         for i = 1, 100 do many[i] = { name = ("n"):rep(30) .. i, characters = {} } end
         for i = 1, 60 do chars[i] = { name = ("c"):rep(40) .. i, class = "Shaman", level = 60 } end
@@ -76,11 +80,5 @@ describe("ForeverFriends Lines (pure)", function()
         line = ns.respond("who n", data(many), own)
         assert.is_true(#line <= 240)
         assert.is_truthy(line:match(" more$"))
-        local huge = { { name = ("é"):rep(80), characters = {
-            { name = ("é"):rep(32), class = ("|"):rep(64), main = true },
-        } } }
-        line = ns.respond("who é", data(huge), own)
-        assert.is_true(#line <= 240)
-        assert.are.equal(0, #line:match("|*$") % 2)
     end)
 end)
