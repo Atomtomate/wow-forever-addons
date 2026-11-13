@@ -39,12 +39,9 @@ ForeverFriendsDB = {
 	},
 	["ratio"] = -1.5,
 	["big"] = 1e3,
-	["hex"] = 0x1F,
 	["flag"] = true,
 	["nothing"] = nil,
 	plain = "single",
 	[3] = "three",
-	long = [[line one
-line two]],
 }
 OtherVar = 7

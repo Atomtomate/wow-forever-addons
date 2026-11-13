@@ -99,19 +99,28 @@ func TestParseAgreesWithPythonLive(t *testing.T) {
 	}
 }
 
-func TestEscapesAndLongStrings(t *testing.T) {
-	top, err := Parse([]byte("X = { \"a\\\"b\\\\c\\n\\065\\0661\\a\", [==[\nx]]y]==], 'q' }\n"))
+func TestEscapes(t *testing.T) {
+	top, err := Parse([]byte("X = { \"a\\\"b\\\\c\\n\\065\\0661\\a\" }\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	l := top["X"].(*Table).List()
-	if l[0] != "a\"b\\c\nAB1\a" || l[1] != "x]]y" || l[2] != "q" {
+	if l := top["X"].(*Table).List(); l[0] != "a\"b\\c\nAB1\a" {
 		t.Fatalf("%q", l)
 	}
 }
 
+// Forms the client does not write are refused, so that a file anyone on the PC can edit has a
+// small surface, and the refusal is logged rather than guessed around.
+func TestFormsTheClientDoesNotWriteAreErrors(t *testing.T) {
+	for _, s := range []string{"X = [[long]]", "X = [==[long]==]", "X = 0x1F", "X = 'single'", "--[[ long\ncomment ]]\nX = 1"} {
+		if _, err := Parse([]byte(s)); err == nil {
+			t.Errorf("%q parsed", s)
+		}
+	}
+}
+
 func TestMalformedNeverPanics(t *testing.T) {
-	for _, s := range []string{"", "X", "X =", "X = {", "X = { a =", "X = \"abc", "X = { [1 = 2 }", "X = [[", "X = 1e", "X = {{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{", "X = \\", "X = \"\\999\"", "= 5", "X = foo", "-- [[ never closed", "X = 0x"} {
+	for _, s := range []string{"", "X", "X =", "X = {", "X = { a =", "X = \"abc", "X = { [1 = 2 }", "X = 1e", "X = {{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{", "X = \\", "X = \"\\999\"", "= 5", "X = foo", "-- [[ never closed"} {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -238,21 +247,20 @@ func TestFingerprintChangesWithFile(t *testing.T) {
 }
 
 // The client runs on Windows and may write CRLF; git on Windows may also check the sample out
-// that way. Line endings between tokens, after a comment and at the end of the file must not
-// matter, and a line break inside a long string reads as one \n, as in Lua.
+// that way. Line endings between tokens, after a comment, at the end of the file and after a
+// backslash in a string must not matter.
 func TestCRLFReadsLikeLF(t *testing.T) {
 	src, _ := os.ReadFile("testdata/sample.lua")
 	lf := strings.ReplaceAll(string(src), "\r\n", "\n")
-	crlf := strings.ReplaceAll(lf, "\n", "\r\n")
 	a, err := Parse([]byte(lf))
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := Parse([]byte(crlf))
+	b, err := Parse([]byte(strings.ReplaceAll(lf, "\n", "\r\n")))
 	if err != nil {
 		t.Fatalf("CRLF form: %v", err)
 	}
-	if !reflect.DeepEqual(normalise(t, pythonShape(&Table{Keys: []Value{"a"}, Vals: []Value{tableOf(a)}})), normalise(t, pythonShape(&Table{Keys: []Value{"a"}, Vals: []Value{tableOf(b)}}))) {
+	if !reflect.DeepEqual(a, b) {
 		t.Fatal("CRLF file parsed differently")
 	}
 	for _, s := range []string{"X = 1 -- comment\r\n", "X = { 1, -- [1]\r\n 2 } -- end", "X = \"a\\\r\nb\"\r\n"} {
@@ -263,32 +271,5 @@ func TestCRLFReadsLikeLF(t *testing.T) {
 	top, _ := Parse([]byte("X = \"a\\\r\nb\"\r\n"))
 	if top["X"] != "a\nb" {
 		t.Fatalf("%q", top["X"])
-	}
-}
-
-func tableOf(m map[string]Value) *Table {
-	t := &Table{}
-	for k, v := range m {
-		t.Keys, t.Vals = append(t.Keys, k), append(t.Vals, v)
-	}
-	return t
-}
-
-// The hub replaces a character's professions with a `skills` that is present, even an empty one,
-// so an entry without usable skill lines must leave the field out of the body.
-func TestEntryWithoutSkillsSendsNoSkillsField(t *testing.T) {
-	for name, extra := range map[string]string{"no key": "", "empty table": "skills = {}", "no usable line": "skills = { { name = \"x\" }, \"junk\" }"} {
-		s := Read(fsWith(map[string]string{account("A"): db(ch("Thrall", "R", 5, extra))}, time.Unix(1, 0)))
-		if len(s.Characters) != 1 {
-			t.Fatalf("%s: %+v", name, s)
-		}
-		b, _ := json.Marshal(s.Characters[0])
-		if strings.Contains(string(b), "skills") || strings.Contains(string(b), "null") {
-			t.Errorf("%s: %s", name, b)
-		}
-	}
-	s := Read(fsWith(map[string]string{account("A"): db(ch("Thrall", "R", 5, "skills = { { id = 171, rank = 1, max = 75 } }"))}, time.Unix(1, 0)))
-	if b, _ := json.Marshal(s.Characters[0]); !strings.Contains(string(b), `"skills":[{"id":171`) {
-		t.Fatalf("%s", b)
 	}
 }

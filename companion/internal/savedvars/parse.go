@@ -1,6 +1,8 @@
 // Package savedvars reads the file the game client writes for the addon (docs/CONTRACT.md §1).
 // The file is Lua, but only the dialect the client emits: top-level assignments of tables,
-// strings, numbers, booleans and nil. Nothing is executed.
+// double-quoted strings with escapes, decimal numbers, booleans and nil, with `--` line
+// comments. Nothing is executed, and a form outside that dialect is an error that is logged
+// and shown by `status`, not guessed at.
 package savedvars
 
 import (
@@ -116,13 +118,6 @@ func (p *parser) skip() error {
 		case c == ' ' || c == '\t' || c == '\n' || c == '\r':
 			p.i++
 		case strings.HasPrefix(p.s[p.i:], "--"):
-			p.i += 2
-			if lvl, ok := p.longOpen(); ok {
-				if _, err := p.longBody(lvl); err != nil {
-					return err
-				}
-				continue
-			}
 			for p.i < len(p.s) && p.s[p.i] != '\n' {
 				p.i++
 			}
@@ -147,39 +142,6 @@ func (p *parser) ident() (string, bool) {
 	return p.s[start:p.i], true
 }
 
-// longOpen consumes [=*[ and returns the number of equals signs.
-func (p *parser) longOpen() (int, bool) {
-	j := p.i
-	if j >= len(p.s) || p.s[j] != '[' {
-		return 0, false
-	}
-	j++
-	lvl := 0
-	for j < len(p.s) && p.s[j] == '=' {
-		lvl++
-		j++
-	}
-	if j < len(p.s) && p.s[j] == '[' {
-		p.i = j + 1
-		return lvl, true
-	}
-	return 0, false
-}
-
-func (p *parser) longBody(lvl int) (string, error) {
-	closer := "]" + strings.Repeat("=", lvl) + "]"
-	end := strings.Index(p.s[p.i:], closer)
-	if end < 0 {
-		return "", fail("long string not closed")
-	}
-	body := p.s[p.i : p.i+end]
-	p.i += end + len(closer)
-	// Lua reads \r\n, \n\r, \n and \r inside a long string as one \n.
-	body = strings.NewReplacer("\r\n", "\n", "\n\r", "\n", "\r", "\n").Replace(body)
-	body = strings.TrimPrefix(body, "\n")
-	return body, nil
-}
-
 func (p *parser) value() (Value, error) {
 	if err := p.skip(); err != nil {
 		return nil, err
@@ -191,13 +153,8 @@ func (p *parser) value() (Value, error) {
 	switch {
 	case c == '{':
 		return p.table()
-	case c == '"' || c == '\'':
-		return p.quoted(c)
-	case c == '[':
-		if lvl, ok := p.longOpen(); ok {
-			return p.longBody(lvl)
-		}
-		return nil, fail("unexpected [ at offset %d", p.i)
+	case c == '"':
+		return p.quoted()
 	case c == '-' || c == '.' || isDigit(c):
 		return p.number()
 	case isIdentStart(c):
@@ -220,55 +177,34 @@ func (p *parser) number() (Value, error) {
 	if p.s[p.i] == '-' {
 		p.i++
 	}
-	if strings.HasPrefix(p.s[p.i:], "0x") || strings.HasPrefix(p.s[p.i:], "0X") {
-		p.i += 2
-		for p.i < len(p.s) && strings.ContainsRune("0123456789abcdefABCDEF", rune(p.s[p.i])) {
+	for p.i < len(p.s) && (isDigit(p.s[p.i]) || p.s[p.i] == '.') {
+		p.i++
+	}
+	if p.i < len(p.s) && (p.s[p.i] == 'e' || p.s[p.i] == 'E') {
+		p.i++
+		if p.i < len(p.s) && (p.s[p.i] == '+' || p.s[p.i] == '-') {
 			p.i++
 		}
-	} else {
-		for p.i < len(p.s) && (isDigit(p.s[p.i]) || p.s[p.i] == '.') {
+		for p.i < len(p.s) && isDigit(p.s[p.i]) {
 			p.i++
-		}
-		if p.i < len(p.s) && (p.s[p.i] == 'e' || p.s[p.i] == 'E') {
-			p.i++
-			if p.i < len(p.s) && (p.s[p.i] == '+' || p.s[p.i] == '-') {
-				p.i++
-			}
-			for p.i < len(p.s) && isDigit(p.s[p.i]) {
-				p.i++
-			}
 		}
 	}
-	text := p.s[start:p.i]
-	neg := strings.HasPrefix(text, "-")
-	body := strings.TrimPrefix(text, "-")
-	if strings.HasPrefix(body, "0x") || strings.HasPrefix(body, "0X") {
-		n, err := strconv.ParseUint(body[2:], 16, 64)
-		if err != nil {
-			return nil, fail("bad number %q", text)
-		}
-		f := float64(n)
-		if neg {
-			f = -f
-		}
-		return f, nil
-	}
-	f, err := strconv.ParseFloat(text, 64)
+	f, err := strconv.ParseFloat(p.s[start:p.i], 64)
 	if err != nil {
-		return nil, fail("bad number %q", text)
+		return nil, fail("bad number %q", p.s[start:p.i])
 	}
 	return f, nil
 }
 
-var simpleEscapes = map[byte]byte{'n': '\n', 't': '\t', 'r': '\r', 'a': 7, 'b': 8, 'f': 12, 'v': 11, '\\': '\\', '"': '"', '\'': '\'', '\n': '\n'}
+var simpleEscapes = map[byte]byte{'n': '\n', 't': '\t', 'r': '\r', 'a': 7, 'b': 8, 'f': 12, 'v': 11, '\\': '\\', '"': '"', '\n': '\n'}
 
-func (p *parser) quoted(q byte) (Value, error) {
+func (p *parser) quoted() (Value, error) {
 	p.i++
 	var b []byte
 	for p.i < len(p.s) {
 		c := p.s[p.i]
 		switch {
-		case c == q:
+		case c == '"':
 			p.i++
 			return string(b), nil
 		case c == '\n':
@@ -333,7 +269,7 @@ func (p *parser) table() (Value, error) {
 		}
 		var key Value
 		switch c := p.s[p.i]; {
-		case c == '[' && !p.isLongString():
+		case c == '[':
 			p.i++
 			k, err := p.value()
 			if err != nil {
@@ -370,13 +306,6 @@ func (p *parser) table() (Value, error) {
 			p.eat(';')
 		}
 	}
-}
-
-func (p *parser) isLongString() bool {
-	save := p.i
-	_, ok := p.longOpen()
-	p.i = save
-	return ok
 }
 
 func (p *parser) identThenEquals() bool {

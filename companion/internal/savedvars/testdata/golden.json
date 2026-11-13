@@ -40,12 +40,10 @@
   ],
   "ratio": -1.5,
   "big": 1000.0,
-  "hex": 31,
   "flag": true,
   "nothing": null,
   "plain": "single",
-  "3": "three",
-  "long": "line one\nline two"
+  "3": "three"
  },
  "OtherVar": 7
 }
