@@ -1,0 +1,47 @@
+ForeverFriendsDB = {
+	["version"] = 1,
+	["characters"] = {
+		["Thrallina-Everlook"] = {
+			["name"] = "Thrallina",
+			["realm"] = "Everlook",
+			["class"] = "SHAMAN",
+			["race"] = "Orc",
+			["level"] = 23,
+			["skills"] = {
+				{
+					["id"] = 171,
+					["name"] = "Alchimie",
+					["rank"] = 145,
+					["max"] = 150,
+				}, -- [1]
+				{
+					["id"] = 164,
+					["name"] = "Schmiedekunst \"Eisen\"\\n",
+					["rank"] = 1,
+					["max"] = 75,
+				}, -- [2]
+			},
+			["seen"] = 1763000000,
+		},
+		["Bankalt-Everlook"] = {
+			["name"] = "Bankalt",
+			["realm"] = "Everlook",
+			["class"] = "MAGE",
+			["race"] = "Gnome",
+			["level"] = 5,
+			["skills"] = {},
+			["seen"] = 1762990000,
+		},
+	},
+	["log"] = {
+		"2026-11-13 20:15:01 login: Thrallina-Everlook level 23",
+		"tab\there\0101 end",
+	},
+	["ratio"] = -1.5,
+	["big"] = 1e3,
+	["flag"] = true,
+	["nothing"] = nil,
+	plain = "single",
+	[3] = "three",
+}
+OtherVar = 7

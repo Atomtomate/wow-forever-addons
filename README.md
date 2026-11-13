@@ -24,13 +24,16 @@ loop are shared.
 | Path | What |
 |---|---|
 | `addons/<Name>/` | one addon: `<Name>.toc`, Lua files, `spec/` with its busted tests |
+| `companion/` | the companion program (Go, standard library only): links a PC to the hub, installs ForeverFriends, uploads characters, reports that the game runs. Its own README has setup, the on-disk layout and the "Verify on the PC" list |
+| `go.mod`, `embed.go` | the Go module, and the package through which the companion carries the addon's files inside its executable |
 | `docs/CONTRACT.md` | the formats the addon, the companion and the hub exchange; their only home |
 | `spec/support/wow.lua` | a small simulated client for busted: frames, events, timers, SavedVariables |
 | `tools/link.ps1` | Windows: directory junction from the game's AddOns folder into this checkout |
 | `tools/pull_sv.ps1` | Windows: copy an addon's SavedVariables file into `data/` after a `/reload` |
 | `tools/parse_sv.py` | turn a SavedVariables file into JSON and a short summary |
 | `.luacheckrc`, `.busted` | lint and test configuration, shared by every addon |
-| `.github/workflows/ci.yml` | luacheck and busted on every push and pull request |
+| `.github/workflows/ci.yml` | luacheck and busted, and the Go checks on Linux and Windows, on every push and pull request |
+| `.github/workflows/release.yml` | builds the companion for Windows, Linux and macOS when a version tag is pushed |
 | `docs/` | research, decisions, handoff, ideas |
 
 ## Working on an addon
@@ -43,8 +46,25 @@ make lint       # luacheck over addons/ and spec/
 make test       # busted
 ```
 
+For the companion: Go 1.24 or newer, nothing else.
+
+```bash
+make golint     # gofmt, go vet, and go vet for Windows
+make gotest     # go test ./...
+make check      # all four
+```
+
 In the game, after linking (`tools/link.ps1 MarketScan`), edit, then `/reload`. A new addon
 folder needs a full client restart; edits to existing files do not.
+
+## Releasing the companion
+
+A release is a tag, and you push it. The tag must be `v` plus the `## Version` line of
+`addons/ForeverFriends/ForeverFriends.toc` (`v0.1.0` for `## Version: 0.1.0`); the release
+workflow refuses any other. The addon and the companion share that one number, because the
+executable carries the addon: a fix to the companion alone still means raising that line first.
+The workflow builds the Windows, Linux and macOS files and publishes them as a GitHub release,
+which is where the hub's `/companion` page sends members.
 
 ## Feedback loop
 

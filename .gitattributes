@@ -1,0 +1,2 @@
+# Test data is compared byte for byte; git must never rewrite its line endings.
+companion/**/testdata/** -text

@@ -1,0 +1,275 @@
+package savedvars
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"reflect"
+	"strconv"
+	"strings"
+	"testing"
+	"testing/fstest"
+	"time"
+
+	"github.com/Atomtomate/wow-forever-addons/companion/internal/wire"
+)
+
+// pythonShape renders a Value the way tools/parse_sv.py does: a table whose keys are 1..n in
+// order is a list, any other a map with string keys.
+func pythonShape(v Value) any {
+	t, ok := v.(*Table)
+	if !ok {
+		return v
+	}
+	list := true
+	for i, k := range t.Keys {
+		if f, ok := k.(float64); !ok || f != float64(i+1) {
+			list = false
+		}
+	}
+	if list && len(t.Keys) > 0 {
+		out := make([]any, len(t.Vals))
+		for i, x := range t.Vals {
+			out[i] = pythonShape(x)
+		}
+		return out
+	}
+	m := map[string]any{}
+	for i, k := range t.Keys {
+		var ks string
+		switch kk := k.(type) {
+		case float64:
+			ks = strconv.FormatFloat(kk, 'g', -1, 64)
+		case string:
+			ks = kk
+		default:
+			ks = fmt.Sprint(kk)
+		}
+		m[ks] = pythonShape(t.Vals[i])
+	}
+	return m
+}
+
+func normalise(t *testing.T, v any) any {
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out any
+	if err := json.Unmarshal(b, &out); err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+func TestParseAgreesWithPythonGolden(t *testing.T) {
+	src, _ := os.ReadFile("testdata/sample.lua")
+	got, err := Parse(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shaped := map[string]any{}
+	for k, v := range got {
+		shaped[k] = pythonShape(v)
+	}
+	golden, _ := os.ReadFile("testdata/golden.json")
+	var want any
+	if err := json.Unmarshal(golden, &want); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(normalise(t, shaped), want) {
+		t.Fatalf("Go parser and golden differ:\n%v\n%v", normalise(t, shaped), want)
+	}
+}
+
+func TestParseAgreesWithPythonLive(t *testing.T) {
+	py, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("no python3")
+	}
+	out, err := exec.Command(py, "-I", "../../../tools/parse_sv.py", "testdata/sample.lua", "--json", "/dev/stdout", "--quiet").Output()
+	if err != nil {
+		t.Skip("parse_sv.py could not run here:", err)
+	}
+	golden, _ := os.ReadFile("testdata/golden.json")
+	var a, b any
+	if json.Unmarshal(out, &a) != nil || json.Unmarshal(golden, &b) != nil || !reflect.DeepEqual(a, b) {
+		t.Fatal("golden.json is stale: regenerate it with tools/parse_sv.py")
+	}
+}
+
+func TestEscapes(t *testing.T) {
+	top, err := Parse([]byte("X = { \"a\\\"b\\\\c\\n\\065\\0661\\a\" }\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l := top["X"].(*Table).List(); l[0] != "a\"b\\c\nAB1\a" {
+		t.Fatalf("%q", l)
+	}
+}
+
+// Forms the client does not write are refused, so that a file anyone on the PC can edit has a
+// small surface, and the refusal is logged rather than guessed around.
+func TestFormsTheClientDoesNotWriteAreErrors(t *testing.T) {
+	for _, s := range []string{"X = [[long]]", "X = [==[long]==]", "X = 0x1F", "X = 'single'", "--[[ long\ncomment ]]\nX = 1"} {
+		if _, err := Parse([]byte(s)); err == nil {
+			t.Errorf("%q parsed", s)
+		}
+	}
+}
+
+func TestMalformedNeverPanics(t *testing.T) {
+	for _, s := range []string{"", "X", "X =", "X = {", "X = { a =", "X = \"abc", "X = { [1 = 2 }", "X = 1e", "X = {{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{", "X = \\", "X = \"\\999\"", "= 5", "X = foo", "-- [[ never closed"} {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("%q panicked: %v", s, r)
+				}
+			}()
+			_, _ = Parse([]byte(s))
+		}()
+	}
+}
+
+func TestEveryPrefixOfSampleIsAnErrorOrWhole(t *testing.T) {
+	src, _ := os.ReadFile("testdata/sample.lua")
+	text := string(src)
+	cut := strings.LastIndex(text[:strings.Index(text, "OtherVar")], "}")
+	for i := 0; i < cut; i++ {
+		if _, err := Parse(src[:i]); err == nil && i > 0 && strings.TrimSpace(text[:i]) != "" {
+			t.Fatalf("a file cut at %d parsed", i)
+		}
+	}
+}
+
+func FuzzParse(f *testing.F) {
+	src, _ := os.ReadFile("testdata/sample.lua")
+	f.Add(src)
+	f.Add([]byte("X = { [1] = 2 }"))
+	f.Fuzz(func(t *testing.T, b []byte) { _, _ = Parse(b) })
+}
+
+func fsWith(files map[string]string, mtime time.Time) fstest.MapFS {
+	m := fstest.MapFS{}
+	for p, c := range files {
+		m[p] = &fstest.MapFile{Data: []byte(c), ModTime: mtime}
+	}
+	return m
+}
+
+func account(name string) string { return "WTF/Account/" + name + "/SavedVariables/ForeverFriends.lua" }
+
+func db(body string) string {
+	return "ForeverFriendsDB = { version = 1, characters = { " + body + " } }"
+}
+
+func ch(name, realm string, seen int, extra string) string {
+	return fmt.Sprintf(`["%s-%s"] = { name = "%s", realm = "%s", class = "SHAMAN", level = 20, seen = %d, %s },`, name, realm, name, realm, seen, extra)
+}
+
+func TestMergeNewerSeenWins(t *testing.T) {
+	fsys := fsWith(map[string]string{
+		account("A"): db(ch("Thrall", "R", 100, `race = "Orc"`) + ch("OnlyA", "R", 50, "")),
+		account("B"): db(ch("Thrall", "R", 200, `race = "Troll"`)),
+	}, time.Unix(1, 0))
+	s := Read(fsys)
+	if len(s.Files) != 2 || !s.Files[0].OK || !s.Files[1].OK {
+		t.Fatalf("%+v", s.Files)
+	}
+	if len(s.Characters) != 2 || s.Characters[0].Race != "Troll" || s.Characters[1].Name != "OnlyA" {
+		t.Fatalf("%+v", s.Characters)
+	}
+}
+
+func TestUploadCaps(t *testing.T) {
+	var body strings.Builder
+	for i := 0; i < 51; i++ {
+		fmt.Fprint(&body, ch(fmt.Sprintf("C%02d", i), "R", 1000+i, ""))
+	}
+	body.WriteString(ch("TooLong", strings.Repeat("r", 65), 9999, ""))
+	var sk strings.Builder
+	for i := 0; i < 41; i++ {
+		fmt.Fprintf(&sk, `{ id = %d, name = "n", rank = 1, max = 75 },`, 100+i)
+	}
+	body.WriteString(ch("Skilled", "R", 5000, "skills = { "+sk.String()+" }"))
+	s := Read(fsWith(map[string]string{account("A"): db(body.String())}, time.Unix(1, 0)))
+	if len(s.Characters) != wire.MaxCharacters {
+		t.Fatal(len(s.Characters))
+	}
+	if s.Characters[0].Name != "Skilled" || len(s.Characters[0].Skills) != wire.MaxSkills {
+		t.Fatalf("%+v", s.Characters[0])
+	}
+	for _, c := range s.Characters {
+		if c.Name == "TooLong" {
+			t.Fatal("65-byte realm sent")
+		}
+	}
+	b, _ := json.Marshal(s.Characters[0])
+	if strings.Contains(string(b), `"name":"n"`) {
+		t.Fatal("skill name sent")
+	}
+}
+
+func TestPartialAndForeignFiles(t *testing.T) {
+	fsys := fsWith(map[string]string{
+		account("A"): "ForeverFriendsDB = { version = 1, characters = { [\"X-R\"] = { name = ",
+		account("B"): "ForeverFriendsDB = { version = 2, characters = {} }",
+		account("C"): db(ch("Good", "R", 5, "")),
+		account("D"): db(`["noclass"] = { name = "N", realm = "R" }, ["notable"] = 3,`),
+	}, time.Unix(1, 0))
+	s := Read(fsys)
+	ok := map[string]bool{}
+	for _, f := range s.Files {
+		ok[f.Path] = f.OK
+	}
+	if ok[account("A")] || ok[account("B")] || !ok[account("C")] || !ok[account("D")] {
+		t.Fatalf("%+v", s.Files)
+	}
+	if len(s.Characters) != 1 || s.Characters[0].Name != "Good" {
+		t.Fatalf("%+v", s.Characters)
+	}
+}
+
+func TestNoFilesIsEmpty(t *testing.T) {
+	s := Read(fstest.MapFS{})
+	if len(s.Files) != 0 || len(s.Characters) != 0 {
+		t.Fatal(s)
+	}
+}
+
+func TestFingerprintChangesWithFile(t *testing.T) {
+	a := Read(fsWith(map[string]string{account("A"): db("")}, time.Unix(1, 0)))
+	b := Read(fsWith(map[string]string{account("A"): db("")}, time.Unix(2, 0)))
+	if a.Files[0].Fingerprint == b.Files[0].Fingerprint {
+		t.Fatal("same fingerprint")
+	}
+}
+
+// The client runs on Windows and may write CRLF; git on Windows may also check the sample out
+// that way. Line endings between tokens, after a comment, at the end of the file and after a
+// backslash in a string must not matter.
+func TestCRLFReadsLikeLF(t *testing.T) {
+	src, _ := os.ReadFile("testdata/sample.lua")
+	lf := strings.ReplaceAll(string(src), "\r\n", "\n")
+	a, err := Parse([]byte(lf))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := Parse([]byte(strings.ReplaceAll(lf, "\n", "\r\n")))
+	if err != nil {
+		t.Fatalf("CRLF form: %v", err)
+	}
+	if !reflect.DeepEqual(a, b) {
+		t.Fatal("CRLF file parsed differently")
+	}
+	for _, s := range []string{"X = 1 -- comment\r\n", "X = { 1, -- [1]\r\n 2 } -- end", "X = \"a\\\r\nb\"\r\n"} {
+		if _, err := Parse([]byte(s)); err != nil {
+			t.Errorf("%q: %v", s, err)
+		}
+	}
+	top, _ := Parse([]byte("X = \"a\\\r\nb\"\r\n"))
+	if top["X"] != "a\nb" {
+		t.Fatalf("%q", top["X"])
+	}
+}
