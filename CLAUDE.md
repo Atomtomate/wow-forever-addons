@@ -33,8 +33,9 @@ style applies here too (lightweight, decisions written down, the owner merges).
 - Pure logic (packing, maths, parsing) lives in files with no client globals so busted can load
   them without the simulated client. Client-facing code is thin and tested through
   `spec/support/wow.lua`.
-- `make lint test` must pass before a commit (`.githooks/pre-commit`, same as CI). Lint fails
-  on an unlisted global: list it in `.luacheckrc` or make it local.
+- `make lint test` must pass before a commit (`.githooks/pre-commit`, same as CI), and
+  `make golint gotest` as well when a Go file changed. Lint fails on an unlisted global: list it
+  in `.luacheckrc` or make it local.
 - What a test cannot prove is written into the addon's README as "Verify in client" and into
   `docs/HANDOFF.md`, with the exact `/dump` or `/run` line to try.
 - Draft PRs; the owner says merge. Ask before a new library dependency (Ace3 and the like, and
