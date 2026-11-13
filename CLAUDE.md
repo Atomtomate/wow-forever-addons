@@ -21,9 +21,10 @@ style applies here too (lightweight, decisions written down, the owner merges).
   moves gold or items. Scanning reads only. This is both Blizzard's rule and ours (D5).
 - **SavedVariables is the only output.** No file I/O, no network. Logs go into a capped ring
   table inside the addon's SavedVariables so they come out with the data.
-- **A unit's identity can be a secret value too.** `UnitName`, `UnitClass`, `UnitRace` and
-  `UnitGUID` are documented as secret when unit identity is restricted (`docs/RESEARCH.md` §6).
-  Check before storing or comparing one.
+- **A unit's identity can be a secret value too.** `UnitName`, `UnitFullName`, `UnitClass`,
+  `UnitRace` and `UnitGUID` are documented as secret when unit identity is restricted
+  (`docs/RESEARCH.md` §6). Check before storing or comparing one, and compare inside the
+  protected call: `v == nil` on a secret is a comparison too.
 
 ## Working agreement
 
@@ -34,16 +35,14 @@ style applies here too (lightweight, decisions written down, the owner merges).
   `spec/support/wow.lua`.
 - `make lint test` must pass before a commit (`.githooks/pre-commit`, same as CI). Lint fails
   on an unlisted global: list it in `.luacheckrc` or make it local.
-- What a test cannot prove is written into the addon's `docs/` note as "verify in client" and
-  into `docs/HANDOFF.md`, with the exact `/dump` or `/run` line to try.
+- What a test cannot prove is written into the addon's README as "Verify in client" and into
+  `docs/HANDOFF.md`, with the exact `/dump` or `/run` line to try.
 - Draft PRs; the owner says merge. Ask before a new library dependency (Ace3 and the like, and
   any Go module for the companion, which uses the standard library only), a SavedVariables
   format change that loses data, or anything that automates play.
-- **`docs/CONTRACT.md` is the one home of what the addon, the companion and the hub exchange.**
-  A change to a format changes it there first, and the other two parties in the same breath.
-  Inside the game folder the companion (`companion/`, Go) reads one SavedVariables file per
-  account and writes only into the two ForeverFriends addon folders; outside it, it keeps its
-  own config folder, program copy and autostart entry (D7, `docs/CONTRACT.md` §5).
+- **`docs/CONTRACT.md` is the one home of what the addon, the companion and the hub exchange**,
+  and of what the companion may read and write on a PC (its §5). A change to a format changes
+  it there first, and the other two parties in the same breath.
 - Code copied from another addon carries its licence; prefer writing our own.
 
 ## Conventions

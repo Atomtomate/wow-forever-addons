@@ -24,7 +24,6 @@ loop are shared.
 | Path | What |
 |---|---|
 | `addons/<Name>/` | one addon: `<Name>.toc`, Lua files, `spec/` with its busted tests |
-| `companion/` | the companion program (Go): installs ForeverFriends, uploads characters, reports that the game runs |
 | `docs/CONTRACT.md` | the formats the addon, the companion and the hub exchange; their only home |
 | `spec/support/wow.lua` | a small simulated client for busted: frames, events, timers, SavedVariables |
 | `tools/link.ps1` | Windows: directory junction from the game's AddOns folder into this checkout |

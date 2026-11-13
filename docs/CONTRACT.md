@@ -40,7 +40,7 @@ ForeverFriendsDB = {
             skills = {                      -- non-header lines of C_SkillInfo in the client's order, the first 40
                 { id = 171, name = "Alchimie", rank = 145, max = 150 },
             },
-            seen = 1763000000,              -- GetServerTime() when this entry was last refreshed
+            seen = 1763000000,              -- GetServerTime() of the last read that named the character
         },
     },
     log = { "2026-11-13 20:15:01 login: Thrallina-Everlook level 23" },   -- ring, at most 50 lines
@@ -52,8 +52,10 @@ ForeverFriendsDB = {
   three parties cannot disagree about it. The localized `name` of a skill stays in this file
   for a person reading it; it is not sent (§3).
 - A value the client returns as `nil` or as a secret value is not written; the field keeps what
-  it had. An entry without `name`, `realm` and `class` is not created. An empty read of the
-  skill lines (a client that is not ready yet) keeps the old list.
+  it had. An entry without `name`, `realm` and `class` is not created. `seen` moves only on a
+  read in which the client gave name, realm and class. A read of the skill lines that is empty
+  (a client that is not ready yet), or in which any line could not be used, keeps the old
+  list: a list with one line missing would make the hub drop that profession.
 - The key is opaque: readers use the fields, never split the key.
 - A table the client loads back whose `version` the addon does not know is replaced by an empty
   one; the characters come back as they are played.
@@ -110,7 +112,7 @@ ForeverFriendsData = {
 - The file is replaced atomically (written beside it, then renamed) and only when its content
   would differ, `written` aside.
 - The addon treats the table as untrusted: it checks the type of every field it reads, skips
-  what does not fit, and never calls, loads or concatenates-and-runs anything from it. Before
+  what does not fit or lies outside the bounds of §3.3's member list, and never calls, loads or concatenates-and-runs anything from it. Before
   it shows a string it doubles every `|` and drops control characters, so a name cannot carry
   one of the game's chat codes.
 - A folder that did not exist when the game started (the first install of either addon) is seen
@@ -147,7 +149,7 @@ the hub for a short code, and a member who is logged in on the hub approves that
    Answer, 200:
 
    ```json
-   { "ok": true, "device": "3f9c2a71d05b88e4", "user_code": "WXYZ-BCDF",
+   { "ok": true, "device": "3f9c2a71d05b88e4", "user_code": "HKRT-BCDF",
      "expires_in": 600, "interval": 5 }
    ```
 
@@ -349,7 +351,10 @@ implemented is the hub's (`wow-forever-hub`, `docs/DECISIONS.md` D17).
   race and class table does not allow, does not set a race: a new character gets none, a
   matched one keeps its own.
 - A skill line is a profession when its `id` is in the table below; other lines are dropped. A
-  `rank` outside 1 to 300 is stored without a rank.
+  `rank` outside 1 to 300 is stored without a rank. An entry that carries `skills` has its
+  professions replaced by what that list holds, even when it holds none; an entry without
+  `skills` leaves the professions as they are, and so does one without `level` for the level.
+  The companion leaves `skills` out when the addon's entry has none.
 
 | `class` token | hub | | `race` token | hub |
 |---|---|---|---|---|
