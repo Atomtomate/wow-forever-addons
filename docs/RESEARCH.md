@@ -214,6 +214,216 @@ in the client; a flag in a documentation file is not proof of behaviour (§4.1).
 That an addon has no file or network access is standard knowledge and was not re-derived here
 **[unverified here]**; D7 rests on it.
 
+## 7. Companion app: choosing the technology (2026-11-14)
+
+Condensed for D9 from the companion-app coordinator session's report
+(`companion-app-open-search.md`, written 2026-11-14, about 860 lines, not in this repository).
+Marks as in that report: **[P]** primary source read that day (where the site was blocked, the
+copy in the project's own GitHub repository); **[S]** a web-search summary of a page that could
+not be opened; **[K]** the author's knowledge, not checked. Every size, start time and memory
+figure is **quoted, not measured**. Nothing in it was run on Windows or macOS.
+
+**Read with the owner's correction.** The report's distribution part was written under a stricter
+reading of "private" than the owner meant: it took the whole project as private and so ruled out
+GitHub Releases, public or link-reachable listings, and free signing for open source. The owner
+then said that the repository and its releases are public and only the hosted hub instance and
+its data are private (D9). Where the report rules a route out for privacy, that ruling no longer
+holds: those routes are open again, and **not examined since**. What it says about the warnings a
+friend sees, about reputation and about the stacks is unaffected.
+
+### 7.1 The answer in one page
+
+- **The judge** is a friend on Windows 11 who clicks a link in the group chat and has no patience.
+  A "scary moment" is one where the system says the program may be dangerous, or where they must
+  do something they could not do without a screenshot.
+- **Unsigned** (any stack): the browser's "isn't commonly downloaded", then "Windows protected your
+  PC", More info, Run anyway [P][S]. Reputation is per file hash, so every new version starts at
+  zero [P]; a file fifteen people download never builds any. Where **Smart App Control** is on, an
+  unsigned file without reputation is blocked with no per-app bypass, Mark of the Web or not [P][S];
+  since April 2026 it can be switched on without reinstalling Windows [S].
+- **Signed in the owner's name**: certificates for a natural person exist in the EU (Certum
+  "Standard", SSL.com "Individual Validation", Sectigo through resellers; roughly EUR 65 to 290 a
+  year; key on a token or in the CA's cloud, the cloud one being what works from CI; at most about
+  460 days) [S]. Friends see the owner's legal name as publisher. SmartScreen most likely still
+  warns: reputation "can take several weeks and hundreds of clean installs from a wide audience"
+  [P]. Whether Smart App Control passes a new, validly signed file was **not verified**.
+- **Free signing for open source**: SignPath Foundation needs an OSI licence (this repository has
+  none), MFA, a published signing policy and their approval; the publisher shown is "SignPath
+  Foundation" [S]. Certum's "Open Source" certificate asks for the project's website and puts "Open
+  Source Developer" in the name [S]. Azure Artifact Signing takes individuals only in the US and
+  Canada [P].
+- **Microsoft Store**: the only route with no warning at all [P]. Free account for individuals since
+  2025-09-10 [S]; certification up to three business days, again for every update [P]. "Private
+  audience" hides the listing from everyone but listed Microsoft accounts, "even if they were able to
+  type in its Store listing URL" [P]. The policies ask for a working demo account and a reachable
+  server (10.3.1, 10.3.2), a privacy policy URL (10.5.1), a disclosed dependency (10.2.4) and forbid
+  downloading code that changes what the app does (10.2.2) [P]. Under MSIX autostart is a manifest
+  startup task, a `foreverfriends://` protocol is one manifest element, AppData and HKCU writes are
+  redirected and removed on uninstall, writes to the game folder are not [P]. **Whether the Store
+  certifies this app is the report's largest unknown**; only a submission answers it.
+- **macOS**: unsigned means "Apple could not verify...", then System Settings, Privacy & Security,
+  Open Anyway, an administrator password; the Control-click bypass is gone since macOS 15 [S].
+  Developer ID plus notarization costs USD 99 a year for an individual, no waiver [S]; it is an
+  automated scan, not a listing [P]. **Linux**: an AppImage or a binary, no prompt; stock GNOME shows
+  no tray icons without an extension [K], so the app must be usable without a tray; Flatpak's
+  sandbox hides the host's processes and the Wine prefix [K].
+- **One identical file for every member.** A per-member build has a hash nobody else downloads, can
+  never gain reputation, and signed would need signing on the hub server [K][P: "Do not modify signed
+  files"]. Zero-typing setup comes from beside the file: a "Connect this PC" link on the hub page
+  (`foreverfriends://...` with the address and a one-time code, confirmed in the app so that a link
+  sent by someone else cannot attach the PC to their account), or a code in the file name (fragile
+  when the browser appends " (1)").
+- **A first-run window is needed**: Windows 11 puts a new tray icon in the overflow by default [K],
+  so a tray-only program looks like nothing happened.
+- **Updates**: verified against an Ed25519 key whose public half is compiled into the app, the
+  private half signing in CI or offline and never on the hub; fail closed, refuse a lower version.
+  Files the app downloads itself carry no Mark of the Web, so SmartScreen does not reappear; Smart
+  App Control still judges them. The report fetched the manifest from the hub with the companion's
+  signed requests because it thought releases private; with public releases that choice is open.
+  Tauri's updater makes the signature mandatory ("This cannot be disabled") and takes custom
+  endpoints [P]; whether it can send the companion's signed headers was **not verified**.
+
+### 7.2 How the options were found, and the long list
+
+The space was built from the jobs (watch one file, list processes, speak HTTP, write two folders,
+show a tray icon, ask one or two things once), from what shipped programs of this shape use
+(WeakAuras Companion is Electron [P]; Tailscale carries `fyne.io/systray` [P]; Ollama's desktop app
+is Go with a React UI [P]; Syncthing Tray is Qt [P]; WowUp, CurseForge, Raider.IO and Warcraft Logs
+are Electron [K]), and from the registries for liveness (dead ends: `native-windows-gui` 2022,
+`lxn/walk` 2021, `getlantern/systray` 2023, Flutter's `system_tray` 2023, `cacao` 2023) [P].
+
+Of 49 options, the ones that matter here:
+
+| Option | Verdict |
+|---|---|
+| Rust + Tauri 2.12 | **Ranked first** (7.3) |
+| C# + Avalonia 12 | **Second.** Own renderer, Fluent look, tray built in, best headless tests (`Avalonia.Headless`) [P]; tray menu on Windows drawn by Avalonia, not Windows (`TrayIconImpl.cs`) [P]; 60 to 120 MB resident [K] |
+| No framework: tray library + system dialogs (Go `fyne.io/systray` + `ncruces/zenity`, or Rust `tray-icon` + `muda` + `rfd`) | **Third.** Smallest (10 to 20 MB [K]), nothing can look foreign; no window to grow into, Mac and Linux release plumbing by hand. Go's FAQ calls antivirus false positives "a common occurrence, especially on Windows" [P] |
+| Go + Wails 3.1 | Tauri's twin in Go, with MSIX packing and a Windows build without cgo built in [P]; **3.0.0 tagged 2026-10-26** after years of alpha [P], one lead maintainer [K]. Not ranked on three weeks of stability; re-compare after six quiet months |
+| Electron 45 | Fourth by a clear distance. What every WoW companion uses; about 373 MB on disk and 110 to 280 MB for an empty window [P], and a browser to re-release several times a year |
+| C# WinForms on .NET 10 | The most native on Windows, Windows only; first if Windows is declared the only system with an app |
+| wxWidgets / `wxdragon` | The strongest native-widget cross-platform option; C++ and CMake, weak headless tests, the Rust bindings one maintainer's [P] |
+| Local web page on loopback (Syncthing's shape) | "A browser tab is the settings" is what the owner called home-built; needs a hardened loopback server. No |
+| Python + `pystray`, Java SWT/Swing, Tcl/Tk, Kotlin Compose | `pystray` last released 2023, frozen Python the worst antivirus case [K]; a resident JVM of 150 MB and up, tray blurry or missing on Linux [K]. No |
+| Flutter, Fyne, Slint, egui and the like | Community-plugin tray and autostart, a visibly foreign look, or too young. No |
+| PowerShell + scheduled task, Overwolf, PWA, shipping the addon through CurseForge | "Paste this into PowerShell" is how malware spreads; a platform with advertising; a page cannot watch a file; two installs. No |
+
+### 7.3 Tauri 2, tray-first
+
+- **Draws with** the system's menus for the tray (`muda`, `tray-icon`: a Win32 menu, `NSMenu`, GTK)
+  and the system's dialogs (`rfd`); a window is HTML in the system web view (WebView2, part of the
+  OS on Windows 10 from 2018 and 11 [P]; WKWebView; WebKitGTK).
+- **What a friend could notice** is only what the page gets wrong in a window: a white flash while
+  the web view starts, selectable text, a browser context menu, a non-system font. Fixable, but work
+  a native toolkit does not need, to be checked on a real PC.
+- **Parts**, all first-party and released within five weeks of 2026-11-14 [P]: tray and menus built
+  in, `tauri-plugin-single-instance` 2.5.5, `-autostart` 2.7.0, `-deep-link` 2.6.3, `-dialog` 2.8.4,
+  `-notification` 2.8.1, `-updater` 2.14.1. On Linux a left click on the tray icon emits no event;
+  the menu still opens [P].
+- **Footprint** [P, Elanis benchmark, CI machines, noisy]: an empty release build about 3 MB. With a
+  window open on Windows, 187 to 312 MB across its processes and a 650 ms start, **worse than
+  Electron's 110 to 279 MB and 195 ms**, because WebView2 is a browser too; on macOS and Linux 76 to
+  96 MB. "Light" holds on Windows only while no window exists, which is why the app is tray-first.
+  **Whether the web-view processes exit when the last window is destroyed was not found in any
+  source.**
+- **Packaging**: NSIS and MSI, DMG, AppImage, deb, rpm; not MSIX itself (Microsoft's winapp CLI, in
+  public preview, has a Tauri guide for that) [P]. A Windows NSIS build cross-built from Linux works
+  "with caveats" [P].
+- **Testing by agents on Linux**: `cargo test` for the core; the window is a page a headless Chromium
+  shows as WebView2 would (same engine family); `tauri-driver` for the whole app.
+- **Maturity**: 2.0 stable since October 2024, 2.12.5 on 2026-11-06, about 112,000 stars, 18 million
+  crate downloads in 90 days [P]; a version 3 will cost a migration.
+
+### 7.4 The case against, and what would flip it
+
+**The strongest argument against Tauri**: little of what it adds is needed to fix the friend's
+journey. Setup moved to the hub removes the typing; a certificate, or nothing, decides the
+warnings; the existing Go program behind an ordinary installer with a 200-line updater gets nearly
+the same result sooner, without rewriting 3,500 lines that have never run on a PC. What Tauri then
+adds is a window, and on Windows that window has the weakest evidence. If it opens once at setup
+and almost never again, the owner pays a second language and toolchain for a screen a system
+dialog could show. (Weaker without the Store: Tauri brings the per-user installer, link handler,
+autostart and signed updater as maintained parts.)
+
+| Observation | Then |
+|---|---|
+| The Store's private audience is accepted and Microsoft certifies the app | The package supplies autostart, link handler and updates; no framework, in Go, becomes the cheapest complete answer |
+| A friend's PC has Smart App Control on | An unsigned build cannot run there; a certificate stops being optional |
+| A destroyed Tauri window leaves web-view processes behind, or the window looks like a page however styled | Avalonia first |
+| The app needs no window beyond a confirmation, now or later | No framework first, in Go as it is |
+| Windows is declared the only system with an app | WinForms on .NET 10 first |
+| Wails 3 passes six quiet months | Re-compare it with Tauri |
+
+**The one-hour experiment on the owner's Windows PC** (CI builds the files first): (1) download an
+unsigned build with Edge and Chrome, write down every prompt, repeat with a build one byte
+different, and note whether Smart App Control is On, Evaluation or Off; (2) install a per-user NSIS
+build, click a `foreverfriends://` link, sign out and in, uninstall from Settings; (3) a Tauri tray
+stub: memory with no window, count `msedgewebview2.exe` processes with the window open, close it and
+see whether they exit, time the second opening, judge the window beside Windows Settings. Not in
+the hour: ask one CA what documents it accepts from the owner's country and whether its cloud
+signing works from GitHub Actions. Piece 1's "Verify on the PC" sheet (`docs/HANDOFF.md`) carries
+this.
+
+The report also read the two earlier ones (a loopback setup page; Wails 3 first): their constraints
+"standard library only, no cgo, one Ubuntu runner" were the project's rules, not the friend's
+needs, and on a blank page the second's own text put Tauri first or second.
+
+### 7.5 What could not be verified
+
+Blocked hosts that day: learn.microsoft.com, blogs.windows.com, support.microsoft.com, tauri.app
+and v2.tauri.app, docs.avaloniaui.net, signpath.org, shop.certum.eu, go.dev, docs.rs, lib.rs,
+brew.sh, textslashplain.com and others; documentation was read from its GitHub copy where one
+exists. **Not verified**, in the order the ranking leans on it:
+
+1. Whether the Store would certify this app (one private group, a self-hosted site, `runFullTrust`,
+   starts at logon, writes into another program's folder).
+2. Whether a packaged program writes into the AddOns folder and sees the game's process as an
+   unpackaged one does.
+3. Whether a Tauri app with its last window destroyed drops back to the Rust process alone on
+   Windows, and its real memory and start time on a PC.
+4. Avalonia's memory, size and start time (knowledge only).
+5. That Windows 11 hides a new tray icon in the overflow by default.
+6. Whether Smart App Control, Edge and Chrome treat a file signed by an unknown individual
+   differently from an unsigned one.
+7. Prices, accepted documents per EU country and CI-usable cloud signing for individual
+   certificates (the quoted prices disagree with each other).
+8. Whether Tauri's updater can send the companion's signed headers.
+9. What SmartScreen, the browsers and Defender transmit about a downloaded file (knowledge).
+10. Game detection under Wine or Proton and on macOS: as open as `companion/README.md` says.
+
+### 7.6 Sources (accessed 2026-11-14)
+
+Read from the project's GitHub copy, the site being blocked:
+
+- Microsoft, "Code signing options for Windows app developers", "SmartScreen reputation for Windows
+  app developers", "Choose a distribution path for your Windows app", Store policies, visibility
+  options and certification: `https://github.com/MicrosoftDocs/windows-dev-docs/tree/docs/hub/apps`
+  (`package-and-deploy/`, `publish/`)
+- Microsoft, desktop app extensions and how packaged desktop apps run:
+  `https://github.com/MicrosoftDocs/windows-dev-docs/blob/docs/hub/apps/desktop/modernize/desktop-to-uwp-extensions.md`,
+  `https://github.com/MicrosoftDocs/msix-docs/blob/main/msix-src/desktop/desktop-to-uwp-behind-the-scenes.md`
+- Microsoft winapp CLI and its Tauri guide: `https://github.com/microsoft/winappcli`
+- Tauri documentation: `https://github.com/tauri-apps/tauri-docs/tree/v2/src/content/docs`;
+  `https://github.com/tauri-apps/tray-icon`, `https://github.com/tauri-apps/muda`
+- Wails v3 documentation: `https://github.com/wailsapp/wails/tree/master/docs`
+- Avalonia's Windows tray:
+  `https://github.com/AvaloniaUI/Avalonia/blob/master/src/Windows/Avalonia.Win32/TrayIconImpl.cs`
+- .NET 10 Windows Forms: `https://github.com/dotnet/docs-desktop/blob/main/dotnet-desktop-guide/winforms/whats-new/net100.md`
+- Go FAQ on virus scanners: `https://github.com/golang/website/blob/master/_content/doc/faq.md`
+- The benchmark: `https://github.com/Elanis/web-to-desktop-framework-comparison`
+- Manifests: WeakAuras Companion's `package.json`, Tailscale's `go.mod`, Ollama's `app/`,
+  Syncthing Tray
+
+Read directly: Apple's Developer ID and membership pages (`https://developer.apple.com/developer-id/`);
+the registries crates.io, proxy.golang.org, api.nuget.org, registry.npmjs.org and pub.dev for every
+version and date quoted.
+
+Search summaries only [S]: the Windows Developer Blog on free Store registration (2025-09-10,
+2026-05-07); Microsoft Q&A on Azure Artifact Signing for EU individuals; SignPath's terms; Certum's
+and SSL.com's certificate pages; Microsoft's Smart App Control FAQ and coverage of enabling it
+(2026-04); Edge's download-warning documentation; Apple's help page on unidentified developers;
+Homebrew 5.0 and 6.0 on Gatekeeper. The full list of URLs is in the report.
+
 ## Open questions (max 8)
 1. Does the launch client still fail to load SavedVariables, and is Blizzard's fix scheduled?
 2. Are `ReplicateItems` results usable (non-secret) by an untainted addon on Forever?

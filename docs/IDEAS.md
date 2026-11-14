@@ -30,10 +30,37 @@ The durable backlog; entries are updated, never deleted. Status words: **next**,
   in game: the program does not look for the game on macOS, and on Linux a game under Wine or
   Proton runs as the loader, not as a file in the game folder (matching the process's command
   line is the likely way; nobody has tried it). Needs someone with a Mac and someone on Linux
-  to run the checks. Which comes first, this or the addon list, is the owner's to say.
-- **Companion: update itself, a tray icon** — later. Self-update runs downloaded code on
-  friends' PCs and wants a signing story first (D7 rules it out for now). A tray icon waits
-  for someone who misses it.
+  to run the checks. Which comes first, this or the addon list, is the owner's to say. Since D9
+  (2026-11-14) this is done in the companion app, not the Go program: piece 6 of the plan in
+  `docs/HANDOFF.md`.
+- **Companion: a tray icon** — taken into D9 (2026-11-14): the companion app is tray-first, built
+  in piece 1 of the plan in `docs/HANDOFF.md`.
+- **Companion app: updates itself** — parked on the owner's decision (D9, open decision 2). D7
+  says the companion never runs anything it downloaded and never updates itself; painless
+  adoption argues for silent updates verified against a key pinned in the app. Needs the owner's
+  word and a change to `docs/CONTRACT.md` §5 before any code; then it is piece 7.
+- **Companion app: a signing route for Windows and macOS** — parked on the owner's decision (D9,
+  open decision 1). Unsigned means a browser warning, a SmartScreen warning, and a block where
+  Smart App Control is on. Routes: a certificate in the owner's name (likely still warns for a
+  group this small), free signing for open source (needs an OSI licence; there is no `LICENSE`
+  file), the Microsoft Store. macOS notarization costs USD 99 a year. `docs/RESEARCH.md`
+  "Companion app: choosing the technology".
+- **"Connect this PC" link** — later, piece 8, needs the hub's side
+  (`Atomtomate/wow-forever-hub`). A button on the hub page opens the app through a custom URL
+  scheme with the hub's address and a one-time code, so setup needs no typing and the address
+  never sits in this public repository or a release (D9). Not yet decided; the URL scheme itself
+  is registered by piece 1.
+- **Companion app: a Discord item** — later. Account linking and any bot belong on the hub; the
+  app needs only a menu item that opens the hub's page for it. Waits for the hub to have one.
+- **Companion app: Discord Rich Presence** — later. The only Discord feature that would live in
+  the app itself; it would show what the member is doing to their Discord friends, so it needs
+  the owner's look at D8's "what crosses" first.
+- **Companion app: hub pages inside the app** — later. Showing a hub page in the app's window
+  instead of the browser. Waits for the app's window to exist (piece 4) and for someone who
+  misses it.
+- **Hub skin package** — deferred by the owner ("Not really necessary"). Blizzard's art stays on
+  the private hub and never enters this repository or a release (D9); a skin package installed
+  through a hub feature belongs to `Atomtomate/wow-forever-hub`'s backlog, not here.
 - **Companion: two members on one PC** — later. One companion links one member (D8); a mapping
   from WoW account to member would lift that. Unparks when a couple asks.
 - **Companion installs MarketScan too** — later, once MarketScan has run in the client.

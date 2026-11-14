@@ -145,3 +145,121 @@ it. The rules that shape them:
   only to refuse an older upload, the owner chose "Store it, never show it" (2026-11-13). So
   "nothing else" in the first rule above reads with `docs/CONTRACT.md` §5, which lists every
   field that crosses, `seen` and the outage stretch included.
+
+## D9 — The companion becomes a desktop app in Rust and Tauri 2, tray-first (2026-11-14)
+
+The owner, in the companion-app coordinator session (2026-11-13 and 14), asked for "a shippable
+executable that gives a companion app (in windows I expect this to be optionally in the startup
+and with a tray icon, extendable with linking discord)", and chose Rust with Tauri 2: "I think
+tauri is a good option"; "I wanted to get a bit into rust anyway. It feels like the correct
+lightweight choice for a small scale project like this". The priorities behind the choice:
+"language irrelevant, one person project, should feel native and reactive", and above all
+painless adoption: "All users of this will be in my friend group and I want to provide them an
+experience that is as easy as possible, without solutions that feel like 'custom'/'shaky' or
+'home built, we need to work on it ourselves'. They do not come to this project voluntarily
+(like for an open source project somebody discovers) so having an absolutely painless adoption
+cycle is key."
+
+**The app is tray-first.** No window exists until the member asks for one: a web-view window
+costs memory beside the game. It lives in `companion-app/`. Optional autostart on Windows, a
+tray icon, a window for setup and status on demand, and room for a Discord item later.
+
+**Alternatives that were weighed**, with why they lost (the ranking, the case against Tauri and
+what would flip it are `docs/RESEARCH.md` §7):
+
+- **C# with Avalonia 12** came second: a window that looks like Windows without styling work and
+  the best headless tests, but a resident runtime of 60 to 120 MB, a tray menu that Avalonia
+  draws itself on Windows, and hand-made release steps for macOS and Linux.
+- **A tray library with no framework** (the Go program with `fyne.io/systray`, or the same in
+  Rust) came third: the smallest and nothing can look foreign, but no window to grow into (and a
+  first-run window is needed, because Windows 11 hides a new tray icon in the overflow), and the
+  installer, updater and macOS and Linux packaging are assembled by hand.
+- **Go with Wails 3** is Tauri's twin in Go and would keep the existing language, but 3.0.0 was
+  tagged on 2026-10-26 after years of alpha: three weeks of stability is not "nothing shaky". It
+  is worth a second look after six quiet months.
+- **Electron** is what every WoW companion uses and the most trodden path, but ships a browser
+  (about 373 MB on disk, 110 to 280 MB for an empty window) that must be re-released several
+  times a year: it fails "quiet beside a game".
+- **A page in the browser served on loopback** needs no window toolkit, but a browser tab as the
+  settings is the home-built signal the owner ruled out, and it needs a hardened local server.
+- **Java or Python toolkits** need a resident runtime (a JVM of 150 MB and up) or a frozen Python
+  build (the worst case for antivirus), and their trays are weak on Linux.
+
+The research's strongest case against Tauri is recorded with it: the existing Go program behind
+an ordinary installer and a small updater would give friends nearly the same experience sooner,
+and on Windows a Tauri window costs more memory while open than Electron's in the one benchmark
+found. Tray-first is the answer to the second point; whether the web view's processes exit when
+the window closes is checked on the owner's PC in piece 1.
+
+**What it replaces in D7.** These sentences no longer hold: that the companion "is written in
+**Go and shipped as one executable**", and "It uses the Go standard library only; a dependency
+is asked for first, like a Lua library" (the owner: "This may be an old rule from another
+project. We do not have this 'no dependency' rule here"); and the console setup D7's companion
+does. What stands: D7's five jobs (install the carried addon, upload characters, report that
+the game runs, write the member list, check that the hub is reachable) and its "what it never
+does" list, including "run anything it downloaded, or update itself", which stands until the
+owner decides open decision 2 below. D7's paragraph on releases stands until piece 5 of the plan
+(`docs/HANDOFF.md`) replaces it; its platform paragraph is carried by piece 6. D7's text is not
+edited (this file is append-only); read it with this entry, as D7 is read with D4. One fact in D7's
+release paragraph was too kind: an unsigned program does not warn "each member once" but at every
+new version, because reputation is per file hash (`docs/RESEARCH.md` §7.1).
+
+**The Go companion** in `companion/` (v0.1.0, never run on a real PC, never tagged) stays in the
+tree as the reference implementation and test oracle until the Rust app reaches parity. The
+core of the app is ported to a Rust library crate with no Tauri dependency and proven against
+the Go program byte for byte with golden files generated from it.
+
+**What is public and what is private.** The owner: "The repository is just the code! Careful!
+When talking about private, I mean the actual instance that is being hosted, where all the data
+lives." and "I like the semi-public route". So this repository and its releases are public, and
+the hosted hub instance and its data are private, invite-only. It follows that GitHub Releases
+is an acceptable download channel, and that neither the app nor this repository may contain the
+hub's address or any instance data: the address reaches the app when a PC is linked. (The idea
+on the table, not decided and needing the hub's side: a "Connect this PC" link on the hub page
+that opens the app through a custom URL scheme with the address and a one-time code, so setup
+needs no typing; `docs/IDEAS.md`.)
+
+**Assets.** The owner: "we need to take care of the non-free assets we are using. Those are still
+possible for our private instance, but need to be replaced with license free ones for the
+releases (the custom skin package can then be installed through a private hub feature)". So
+nothing non-free is in this repository or in a release. Every bundled asset (app icon, tray
+icon, installer art, fonts) is original or freely licensed, with its source and licence recorded
+next to it. Blizzard's art stays on the private hub. The skin package as a hub feature is
+deferred ("Not really necessary" for now), and the hub's code stays private "for the
+foreseeable future". Today this repository holds no image, font or sound file; in the game, an
+addon may refer to the client's own textures by path without shipping them.
+
+**Open decisions**, each the owner's. A recommendation marked as such is the coordinator
+session's or its research's, not the owner's word.
+
+1. **Signing, and the Windows trust prompts.** Unsigned, an installer shows a browser warning and
+   a SmartScreen warning, and is blocked outright where Smart App Control is on. A certificate in
+   the owner's own name (roughly EUR 65 to 290 a year in the EU) shows that name to friends but
+   likely still warns, since reputation needs hundreds of installs; whether it passes Smart App
+   Control is not verified. Free signing for open source needs an OSI licence, and this
+   repository has no `LICENSE` file. The Microsoft Store (private audience) is the only route
+   with no warning, at the price of Microsoft's review with a demo account. Apple notarization
+   costs USD 99 a year. *Recommendation (the research):* a certificate in the owner's name if
+   there is any budget; first, let the owner see the unsigned prompts on the PC (piece 1). The
+   research ruled out open-source signing and the Store's public listings for privacy reasons
+   that the owner's public/private line no longer supports: those routes are open and unexamined.
+2. **Self-update.** D7 says the companion never runs anything it downloaded and never updates
+   itself. Painless adoption argues for silent updates. *Recommendation (the research):* updates
+   verified against an Ed25519 key whose public half is built into the app and whose private half
+   signs in CI or offline and is never on the hub; fail closed, refuse a lower version. Needs the
+   owner's word, a new D-entry that changes D7 on purpose, and a change to `docs/CONTRACT.md`
+   before any code (piece 7). Where the update manifest comes from (the hub, as the research
+   assumed, or the public releases) is part of that decision.
+3. **Discord.** Account linking and any bot belong on the hub; the app needs only a menu item that
+   opens the hub. Only Rich Presence would live in the app. *Recommendation (the research):* the
+   menu item once the hub has a page for it; Rich Presence only after the owner looks at what it
+   would show (D8).
+4. **The Go companion's end, and the first release.** *Recommendation (the coordinator):* remove
+   `companion/`, its workflow and `go.mod` once the app reaches parity (piece 5), never tag
+   v0.1.0, and make the Tauri app the first release.
+5. **A licence file.** Whether this repository gets one; it bears on open decision 1 and on what
+   anyone may do with public code. No recommendation recorded.
+6. **How the hub's address reaches the app.** The "Connect this PC" link (a custom URL scheme
+   carrying the address and a one-time code, confirmed in the app) is the idea on the table; it
+   changes `docs/CONTRACT.md` §3 and needs the hub's side (piece 8). Until then the member types
+   or pastes the address once, as in the Go companion.

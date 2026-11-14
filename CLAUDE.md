@@ -44,7 +44,8 @@ style applies here too (lightweight, decisions written down, the owner merges).
   them without the simulated client. Client-facing code is thin and tested through
   `spec/support/wow.lua`.
 - `make lint test` must pass before a commit (`.githooks/pre-commit`, same as CI), and
-  `make golint gotest` as well when a Go file changed. Lint fails on an unlisted global: list it
+  `make golint gotest` as well when a Go file changed (the Rust targets for `companion-app/` are
+  to be added by piece 1 of the plan in `docs/HANDOFF.md`, D9). Lint fails on an unlisted global: list it
   in `.luacheckrc` or make it local.
 - What a test cannot prove is written into the addon's README as "Verify in client" and into
   `docs/HANDOFF.md`, with the exact `/dump` or `/run` line to try.
@@ -59,9 +60,9 @@ style applies here too (lightweight, decisions written down, the owner merges).
   the plan (the owner, 2026-11-13, after one session grew to 900,000). The session that coordinates
   does not do the work itself: it briefs, reviews and decides, and hands edits, pushes and
   bookkeeping to an agent on a cheaper model or to a session of its own.
-- Ask before a new library dependency (Ace3 and the like, and any Go module for the companion,
-  which uses the standard library only), a SavedVariables format change that loses data, or
-  anything that automates play.
+- Ask before a new Lua library dependency (Ace3 and the like), a SavedVariables format change
+  that loses data, or anything that automates play. The companion has no "standard library only"
+  rule (D9): the companion app's crates are named in its pull request's body for the owner.
 - **`docs/CONTRACT.md` is the one home of what the addon, the companion and the hub exchange**,
   and of what the companion may read and write on a PC (its §5). A change to a format changes
   it there first, and the other two parties in the same breath.
