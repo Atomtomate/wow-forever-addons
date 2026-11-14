@@ -84,7 +84,7 @@ The authority is `CLAUDE.md` ("Facts that do not move") and `docs/DECISIONS.md` 
 - SavedVariables is an addon's only output. Inside the game folder the companion reads one
   SavedVariables file per account and writes only inside the two ForeverFriends addon folders;
   outside it, it keeps its own config folder, program copy and autostart entry and nothing
-  else (D7, `docs/CONTRACT.md` §5; the app's installer folder and URL scheme are
+  else (D7, `docs/CONTRACT.md` §5; the app's installer folder and data folder are
   added to §5 before a release reaches members, D9).
 - Nothing non-free in this repository or a release, no hub address and no instance data (D9).
 - Only what `docs/CONTRACT.md` lists crosses the wire; its §5 says what never does.

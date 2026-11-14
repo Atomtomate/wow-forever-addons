@@ -14,32 +14,40 @@ decided scope**: the owner can reorder or cut it.
 0. **This record** (D9, the research, the backlog, this plan). Documentation only.
 1. **App skeleton** in `companion-app/`, run in parallel with piece 0; touches only
    `companion-app/`, the `Makefile` and `.github/workflows/`. Tauri 2, tray-first, a window
-   only on demand, an autostart toggle, single instance, the URL scheme, a folder picker, a
+   only on demand, an autostart toggle, single instance, a folder picker, a
    notification, an original placeholder icon, a per-user Windows installer, CI on Windows,
    macOS and Linux, and a "Verify on the PC" sheet the owner runs to see the unsigned install
    and the native feel. It adds the `make` targets a Rust change must pass and names them in its
    pull request; writing them into `CLAUDE.md` and `.claude/agents.local.md` falls to piece 2.
-   It is a skeleton for the owner's PC, not a release to members, so it may register the
-   installer, autostart and URL scheme ahead of the §5 change that piece 4 or 5 makes.
+   It is a skeleton for the owner's PC, not a release to members, so it may install and
+   register autostart ahead of the §5 change that piece 4 or 5 makes. No URL scheme (D9,
+   decision 6: the member types the hub's address).
 2. **Core port A**: a Rust library crate with no Tauri dependency: the wire formats, request
    signing, the hub client, config, atomic file writes and the log, proven byte-for-byte against
    the Go program with golden files generated from it.
 3. **Core port B**: reading SavedVariables, finding the game folder, the embedded addon and its
    installation, the member list file, the sync loop, telling that the game runs.
 4. **First-run setup and linking** in the app's window; status in the tray. It or piece 5
-   changes `docs/CONTRACT.md` §5 to name the installer folder, the autostart entry and the URL
-   scheme (proposed in the body of the piece 0 pull request), before any release to members.
+   changes `docs/CONTRACT.md` §5 to name the installer folder, the autostart entry, the app's data
+   folder and the web view's cache (proposed in the body of the piece 0 pull request), before
+   any release to members. The member types or pastes the hub's address here (D9, decision 6).
 5. **Windows release**: the installer, autostart, the release workflow rebuilt for builds per
-   operating system; the Go companion and its workflow retired (removal is open decision 4 of
-   D9).
+   operating system, signed with the owner's certificate (D9, decision 1; the certificate
+   authority is chosen before this piece); the Go companion, its workflow and `go.mod` removed
+   (D9, decision 4).
 6. **macOS and Linux** (the `docs/IDEAS.md` entry that was next after version one).
-7. **Updates**, only after the owner's decision (D9, open decision 2).
-8. **"Connect this PC" link**, with the hub's side.
+7. **Updates**: the owner said yes (D9, decision 2); a decision entry with the design and the
+   `docs/CONTRACT.md` change come first, in this piece.
 
-What this changes in the list below: the tag `v0.1.0` and the Go companion's "Verify on the PC"
-run wait for the owner's answer to D9's open decision 4 (the coordinator recommends never
-tagging it and making the Tauri app the first release). Everything about the addon and the hub
-stands.
+The former piece 8, the "Connect this PC" link, is dropped: the member provides the hub's
+address (D9, decision 6); the link is parked in `docs/IDEAS.md`. Discord is backlog, not part of
+the first release.
+
+What this changes in the list below: the tag `v0.1.0` is never pushed and the Go companion's
+"Verify on the PC" run is not done (D9, decision 4, the owner: "yes"); the first release is the
+Tauri app, and the "Verify on the PC" run is piece 1's sheet. Everything about the addon and the
+hub stands. Still open in D9: the licence file (deferred), WebView2 in the installer, macOS
+notarization, and the open points for the pieces.
 
 ## State on 2026-11-13, still current
 
@@ -73,6 +81,9 @@ stands.
 
 ### What has to happen before anyone can use it
 
+Since D9 (2026-11-14), item 2 is dropped: v0.1.0 is never tagged, and members get the Tauri app
+(decision 4). Item 1 stands for whatever companion links first.
+
 1. The hub on the server is updated to `main` by the owner's ops session, so that a companion
    has something to link to. `PUBLIC_URL` must be `https://` and `TRUST_PROXY=1` behind Caddy.
    Until then the companion stops with `could not reach the site (status 404)`.
@@ -81,6 +92,10 @@ stands.
    builds the files the hub's `/companion` page links to.
 
 ### First steps for the next session
+
+These were written before D9. The tag and the Go companion's "Verify on the PC" run in steps 1
+and 2 are replaced by the plan at the top; the addon's "Verify in client" list, steps 3 to 5 and
+the hub update still stand.
 
 1. Ask the owner whether the ops session has updated the hub and whether the tag `v0.1.0` is
    pushed; look at the release workflow's first run.

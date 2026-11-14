@@ -35,26 +35,28 @@ The durable backlog; entries are updated, never deleted. Status words: **next**,
   `docs/HANDOFF.md`.
 - **Companion: a tray icon** — taken into D9 (2026-11-14): the companion app is tray-first, built
   in piece 1 of the plan in `docs/HANDOFF.md`.
-- **Companion app: updates itself** — parked on the owner's decision (D9, open decision 2). D7
-  says the companion never runs anything it downloaded and never updates itself; painless
-  adoption argues for silent updates verified against a key pinned in the app. Needs the owner's
-  word and a change to `docs/CONTRACT.md` §5 before any code; then it is piece 7.
-- **Companion app: a signing route for Windows and macOS** — parked on the owner's decision (D9,
-  open decision 1). Unsigned means a browser warning, a SmartScreen warning, and a block where
-  Smart App Control is on. Routes: a certificate in the owner's name (likely still warns for a
-  group this small), free signing for open source (needs an OSI licence; there is no `LICENSE`
-  file), the Microsoft Store. macOS notarization costs USD 99 a year. `docs/RESEARCH.md`
-  "Companion app: choosing the technology".
-- **"Connect this PC" link** — later, piece 8, needs the hub's side
-  (`Atomtomate/wow-forever-hub`). A button on the hub page opens the app through a custom URL
-  scheme with the hub's address and a one-time code, so setup needs no typing and the address
-  never sits in this public repository or a release (D9). Not yet decided; the URL scheme itself
-  is registered by piece 1.
-- **Companion app: a Discord item** — later. Account linking and any bot belong on the hub; the
-  app needs only a menu item that opens the hub's page for it. Waits for the hub to have one.
-- **Companion app: Discord Rich Presence** — later. The only Discord feature that would live in
-  the app itself; it would show what the member is doing to their Discord friends, so it needs
-  the owner's look at D8's "what crosses" first.
+- **Companion app: updates itself** — later, piece 7. The owner said yes on 2026-11-14 (D9,
+  decision 2), so D7's "never updates itself" is to change. Before any code: a decision entry
+  with the design (the research recommends updates verified against a key built into the app,
+  the private key signing in CI or offline, never on the hub) and where the files come from (the
+  public releases or the hub), and the change to `docs/CONTRACT.md`.
+- **Companion app: signing for Windows** — next, before piece 5. The owner accepts a certificate
+  in their own name as a private person (D9, decision 1, 2026-11-14). To settle: which
+  certificate authority, whether its signing works from GitHub Actions, and what Smart App
+  Control does with a newly signed file. `docs/RESEARCH.md` §7.1.
+- **Companion app: macOS notarization** — parked on the owner's word. Apple's Developer ID costs
+  USD 99 a year; without it a Mac friend goes through System Settings to open the app.
+- **"Connect this PC" link** — parked. A button on the hub page that would open the app through
+  a custom URL scheme with the hub's address and a one-time code, so setup needs no typing. The
+  owner chose instead that the member provides the address ("user provides it", D9, decision 6,
+  2026-11-14), so the app registers no URL scheme. Would need the hub's side
+  (`Atomtomate/wow-forever-hub`) and a change to `docs/CONTRACT.md` §3.
+- **Companion app: a Discord item** — later, not in the first release (the owner, 2026-11-14: "not
+  a day0 item"). Account linking and any bot belong on the hub; the app needs only a menu item
+  that opens the hub's page for it. Waits for the hub to have one.
+- **Companion app: Discord Rich Presence** — later, not in the first release. The only Discord
+  feature that would live in the app itself; it would show what the member is doing to their
+  Discord friends, so it needs the owner's look at D8's "what crosses" first.
 - **Companion app: hub pages inside the app** — later. Showing a hub page in the app's window
   instead of the browser. Waits for the app's window to exist (piece 4) and for someone who
   misses it.

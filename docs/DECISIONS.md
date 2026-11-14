@@ -198,12 +198,13 @@ project. We do not have this 'no dependency' rule here"); and, with them, the co
 the Go companion (`companion/README.md`). What stands: D7's five jobs (install the carried
 addon, upload characters, report that the game runs, write the member list, check that the hub
 is reachable) and its "what it never does" list, including "run anything it downloaded, or
-update itself", which stands until the owner decides open decision 2 below. D7's paragraph on
+update itself", which the owner has agreed to change (decision 2 below) but which stands until
+the decision entry that designs updates replaces it. D7's paragraph on
 releases stands until piece 5 of the plan (`docs/HANDOFF.md`) replaces it; its platform
 paragraph is carried by piece 6. D7's text is not edited (this file is append-only); read it
 with this entry, as D7 is read with D4. What the app keeps on a PC (an installer's folder, the
-autostart entry, the registered URL scheme) must be named in `docs/CONTRACT.md` §5 before a
-release reaches members (piece 4 or 5); what a "Connect this PC" link carries is §3. One fact in
+autostart entry, its data folder and the web view's cache) must be named in `docs/CONTRACT.md` §5
+before a release reaches members (piece 4 or 5). One fact in
 D7's release paragraph was too kind: an unsigned program does not warn "each member once" but at
 every new version, because reputation is per file hash (`docs/RESEARCH.md` §7.1).
 
@@ -217,14 +218,9 @@ When talking about private, I mean the actual instance that is being hosted, whe
 lives." and "I like the semi-public route". So this repository and its releases are public, and
 the hosted hub instance and its data are private, invite-only. It follows that GitHub Releases
 is an acceptable download channel, and that neither the app nor this repository may contain the
-hub's address or any instance data: the address reaches the app when a PC is linked. (The idea
-on the table, not decided and needing the hub's side: a "Connect this PC" link on the hub page
-that opens the app through a custom URL scheme with the address and a one-time code, so setup
-needs no typing; `docs/IDEAS.md`.) Until that is decided, a `foreverfriends://` link carries no meaning:
-the skeleton of piece 1 registers the scheme, only displays what arrives through it and treats it
-as untrusted. Today the companion starts a link and the hub answers with the code the member
-approves (`docs/CONTRACT.md` §3.1, D8); which way a future one-time code travels is part of open
-decision 6.
+hub's address or any instance data: the member provides the address when a PC is linked
+(decision 6 below). A "Connect this PC" link that would open the app through a custom URL scheme
+is not pursued for now (`docs/IDEAS.md`), and the app registers no URL scheme.
 
 **Assets.** The owner: "we need to take care of the non-free assets we are using. Those are still
 possible for our private instance, but need to be replaced with license free ones for the
@@ -236,8 +232,11 @@ deferred ("Not really necessary" for now), and the hub's code stays private "for
 foreseeable future". Today this repository holds no image, font or sound file; in the game, an
 addon may refer to the client's own textures by path without shipping them.
 
-**Open decisions**, each the owner's. A recommendation marked as such is the coordinator
-session's or its research's, not the owner's word.
+**Decisions that were open**, each the owner's. A recommendation marked as such is the
+coordinator session's or its research's. The owner answered 1 to 6 in the coordinator session on
+2026-11-14 ("1. I am fine and from what I can tell, the costs for private certificates are below
+$100, 2. yes, 3. ok, this is not a day0 item, tho, 4. yes, 5. let's see later, 6. user provides
+it"); each answer follows its item. 5 and 7 stay open.
 
 1. **Signing, and the Windows trust prompts.** Unsigned, an installer shows a browser warning and
    a SmartScreen warning, and is blocked outright where Smart App Control is on. A certificate in
@@ -250,6 +249,13 @@ session's or its research's, not the owner's word.
    there is any budget; first, let the owner see the unsigned prompts on the PC (piece 1). The
    research ruled out open-source signing and the Store's public listings for privacy reasons
    that the owner's public/private line no longer supports: those routes are open and unexamined.
+   **Decided in principle:** the owner: "I am fine and from what I can tell, the costs for
+   private certificates are below $100". So Windows builds for members are signed with a
+   certificate issued to the owner as a private person, the owner's legal name shown as
+   publisher. (The research's quoted range, from search summaries, was EUR 65 to 290 a year.)
+   Still to settle before piece 5: which certificate authority, whether its signing works from
+   GitHub Actions with the key on a token or in the CA's cloud, and what Smart App Control does
+   with the result (all unverified). macOS notarization was not addressed and stays open.
 2. **Self-update.** D7 says the companion never runs anything it downloaded and never updates
    itself. Painless adoption argues for silent updates. *Recommendation (the research):* updates
    verified against an Ed25519 key whose public half is built into the app and whose private half
@@ -257,21 +263,33 @@ session's or its research's, not the owner's word.
    owner's word, a new D-entry that changes D7 on purpose, and a change to `docs/CONTRACT.md`
    before any code (piece 7). Where the update manifest comes from (the hub, as the research
    assumed, or the public releases) is part of that decision.
+   **Decided in principle:** the owner: "yes". The app will update itself, so D7's "never ...
+   update itself" is to change. The design (the research's recommendation above, and where the
+   manifest and files come from) is not decided by this: it needs its own decision entry and the
+   `docs/CONTRACT.md` change before any code, in piece 7.
 3. **Discord.** Account linking and any bot belong on the hub; the app needs only a menu item that
    opens the hub. Only Rich Presence would live in the app. *Recommendation (the research):* the
    menu item once the hub has a page for it; Rich Presence only after the owner looks at what it
    would show (D8).
+   **Decided:** the owner: "ok, this is not a day0 item, tho". The recommendation is accepted,
+   and both are backlog, not part of the first release (`docs/IDEAS.md`).
 4. **The Go companion's end, and the first release.** *Recommendation (the coordinator):* remove
    `companion/`, its workflow and `go.mod` once the app reaches parity (piece 5), never tag
    v0.1.0, and make the Tauri app the first release.
-5. **A licence file.** Whether this repository gets one; it bears on open decision 1 and on what
+   **Decided:** the owner: "yes". `companion/`, its release workflow and `go.mod` are removed
+   once the app reaches parity (piece 5); v0.1.0 is never tagged; the Tauri app is the first
+   release.
+5. **A licence file.** Whether this repository gets one; it bears on decision 1 and on what
    anyone may do with public code. No recommendation recorded.
+   **Deferred:** the owner: "let's see later". Stays open.
 6. **How the hub's address reaches the app.** The "Connect this PC" link (a custom URL scheme
-   carrying the address and a one-time code, confirmed in the app) is the idea on the table; it
-   changes `docs/CONTRACT.md` §3 and needs the hub's side (piece 8). Until then the member types
-   or pastes the address once, as in the Go companion.
-7. **The Windows installer and WebView2.** Tauri's NSIS installer has a `webviewInstallMode`
-   (Tauri's "Windows Installer" guide, read 2026-11-14 from `tauri-apps/tauri-docs`):
+   carrying the address and a one-time code, confirmed in the app) was the idea on the table; it
+   would change `docs/CONTRACT.md` §3 and need the hub's side. **Decided:** the owner: "user
+   provides it". The member types or pastes the hub's address once at setup, as in the Go
+   companion. The link is not planned; it stays an idea in `docs/IDEAS.md`, and the app
+   registers no URL scheme.
+7. **The Windows installer and WebView2** (still open). Tauri's NSIS installer has a
+   `webviewInstallMode` (Tauri's "Windows Installer" guide, read 2026-11-14 from `tauri-apps/tauri-docs`):
    `downloadBootstrapper`, the default, downloads Microsoft's WebView2 bootstrapper and runs it
    when the runtime is missing; `embedBootstrapper` ships the bootstrapper inside our installer
    (about 1.8 MB), which still fetches the runtime from Microsoft; `offlineInstaller` embeds the
