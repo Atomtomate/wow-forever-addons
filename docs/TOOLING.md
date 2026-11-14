@@ -55,12 +55,12 @@ Graphify-Labs). It is not the same thing as graphify.com. [read]
 | Tool | What it is | Measured savings | Lua · Go · Rust · JS · Markdown | Local, no key | In a cloud container | Agents reach it by |
 |------|-----------|------------------|-------------------------------|---------------|----------------------|--------------------|
 | Built-in Grep, Glob, Explore agent | text search | the baseline | all | yes | nothing to install | built in; subagents too |
-| Official LSP plugins (`gopls-lsp`, `lua-lsp`, `rust-analyzer-lsp`, `typescript-lsp`) | `LSP` tool: definitions and references | none published | all but Markdown | yes | **cloud sessions do not start plugin language servers** [read, Claude Code docs] | terminal sessions only |
-| `codebase-memory-mcp` (DeusData), MIT, 0.12.1 (2026-10-16) | tree-sitter + LSP graph in SQLite; 17 tools including `trace_path` and `detect_changes` | vendor preprint: about 10× fewer tokens and 2.1× fewer tool calls over 31 repositories [snippet; arxiv blocked]; no independent check | all; Lua confirmed [ran] | yes; embeddings model bundled | pip/npm wrapper downloads a **330 MB** binary from GitHub releases, which worked here; indexing took 2.3 s [ran] | MCP or CLI |
+| Official LSP plugins (`gopls-lsp`, `lua-lsp`, `rust-analyzer-lsp`, `typescript-lsp`) | `LSP` tool: definitions and references | none published | all but Markdown | yes | **cloud sessions do not start plugin language servers** [read] | terminal sessions only |
+| `codebase-memory-mcp` (DeusData), MIT, 0.12.1 (2026-10-16) | tree-sitter + LSP graph in SQLite; 17 tools including `trace_path` and `detect_changes` | vendor preprint: about 10× fewer tokens and 2.1× fewer tool calls over 31 repositories [snippet] [blocked]; no independent check | all; Lua confirmed [ran] | yes; embeddings model bundled | pip/npm wrapper downloads a **330 MB** binary from GitHub releases, which worked here; indexing took 2.3 s [ran] | MCP or CLI |
 | graphify (`graphifyy` 0.9.108) | AST graph as a JSON file plus a report | vendor "71.5×" on a mixed corpus; a small n=6 test scored 82% against 70.8% of key facts [snippet] | all; Markdown headings without a model | code yes; the documents pass needs a key | `uv tool install`, 164 MB, built in 2.7 s [ran] | skill/hook, CLI, MCP |
 | Serena (`serena-agent` 2.1.0), GPL-3.0 | LSP-backed symbol tools | none published | all five | yes | uv, plus each language server separately (lua-language-server comes from GitHub) [read] | MCP |
 | RepoMapper / `repomap-mcp` | aider-style ranked repository map | none published | the tree-sitter set | yes | pip or `npx` [snippet] | MCP or CLI |
-| CodeGraph (`@colbymchenry/codegraph` 1.6.2) | SQLite graph | vendor claims; a third party reproduced the cut in tool calls but not the cut in cost [snippet; dev.to blocked] | not checked | yes | npm | MCP |
+| CodeGraph (`@colbymchenry/codegraph` 1.6.2) | SQLite graph | vendor claims; a third party reproduced the cut in tool calls but not the cut in cost [snippet] [blocked] | not checked | yes | npm | MCP |
 
 Neither graph tool that was run commits its index. `codebase-memory-mcp` keeps its index in
 `~/.cache/codebase-memory-mcp/` and a file watcher keeps it current. graphify writes
@@ -76,13 +76,13 @@ Three real questions, answered once with grep and once with each graph tool. [ra
 |----------|------|----------|---------------------|
 | Who calls the fake hub's `Approve()`? | 1 command, **4 call sites, exact** (`app_test.go`, `hubapi_test.go`, `linkflow_test.go` ×2) | 1 command, **found 1 of the 4**; the Go call edges are marked "INFERRED" | 1 command with `--include-tests`, **27 callers to depth 2**: a superset, not checked one by one, and every name carries the full project path |
 | Who calls `ns.pushLog`? | 1 command, **2 calls, exact** (`Core.lua:23`, `snapshot_spec.lua:186`) | **missed the spec caller** | **4 inbound edges**; the two beyond grep's were not traced |
-| Which Go files touch SavedVariables? | 1 command, 5 files | not tried | not tried |
+| Which Go files mention SavedVariables? | 1 command (`grep -rli savedvariables --include=*.go`), 5 files including tests | not tried | not tried |
 
 At this size grep plus one file read is cheap and exact. The graph tools cost the same number
 of tool calls and answered less precisely. They also add context of their own: 17 tool schemas
 for `codebase-memory-mcp` in every session that loads it, or a hook that steers every Grep for
 graphify. The one independent benchmark found (60 tasks) has tuned grep beating a graph server
-by 9 F1 points; graphs won only on structural lookups. [snippet; dev.to blocked]
+by 9 F1 points; graphs won only on structural lookups. [snippet] [blocked]
 
 ### Recommendation: adopt nothing yet
 
@@ -94,7 +94,9 @@ binary to trust.
 **When to revisit:** run a three-question A/B like the one above with `codebase-memory-mcp`
 when either of these happens:
 
-- the Rust app (`companion-app/`) or the hub passes about 20,000 lines;
+- the Rust + Tauri companion that replaces the Go one (being added in a parallel session as
+  `companion-app/`, per the brief for this work; not on `main` yet) or the hub passes about
+  20,000 lines;
 - session transcripts show agents re-reading the same files to trace calls.
 
 Adopt it only if it then saves tool calls *and* answers at least as well as grep.
@@ -103,8 +105,10 @@ Adopt it only if it then saves tool calls *and* answers at least as well as grep
 "what calls this" and "what does this change touch". That question grows with the Rust app
 from day one, and installing early would build the habit.
 
-**What adopting it would take, here or on the private hub** (both tools work fully offline once
-installed; nothing is uploaded):
+**What adopting it would take, here or on the private hub.** Both tools work offline once
+installed and upload nothing. The one exception is graphify's optional semantic pass over
+documents, which sends them to an LLM provider. `graphify update .` on code does not use it.
+Never switch it on for the private hub without asking.
 
 - A setup script on the cloud environment: `uv tool install codebase-memory-mcp &&
   codebase-memory-mcp --version`. The `--version` call fetches the binary.
@@ -222,21 +226,21 @@ id: D7
 title: A companion program on each member's PC carries the data
 date: 2026-11-13
 status: accepted          # accepted | superseded | partly-superseded
-supersedes_part: [D4]     # "D4's 'no desktop daemon' no longer holds"
-superseded_by: []         # D9 goes here if D9 replaces the Go companion
-depends_on: [D5, D6]
-relates_to:
-  - docs/CONTRACT.md#5
-  - companion/
-  - pr: 4
+supersedes: []            # whole decisions this one replaces
+supersedes_part: [D4]     # stated in D7: "D4's 'no desktop daemon' no longer holds"
+superseded_by: []         # filled when a later decision replaces this one
+superseded_by_part: []
+depends_on: [D6]          # inferred: the companion carries the ForeverFriends addon; D7 does not say it
+relates_to: [docs/CONTRACT.md#5, companion/]
+prs: [4]
 open_questions: []
 ---
 ```
 
-D4 would carry `superseded_by_part: [D7]`, D8 `depends_on: [D7]`, and every entry that reads
-or acts on the client `depends_on: [D2, D5]`. The exact edges come from the text of each
-decision when the split is done. The ones above are illustrative, except D7 replacing part of
-D4, which D7 states.
+D4 would carry `superseded_by_part: [D7]`. Only that edge is stated in the text today. The
+others (D7 on D6, D8 on D7, client-facing entries on D2 and D5) are inferences, and the session
+that does the split would propose them for review. If the companion-app session's D9 replaces
+the Go companion, D9 gets `supersedes_part: [D7]` and D7 `superseded_by_part: [D9]`.
 
 ### Decisions for the owner
 
@@ -247,6 +251,9 @@ D4, which D7 states.
 3. Trying Basic Memory later is a new dependency (AGPL, from PyPI). Per `CLAUDE.md` it waits
    for your yes; nothing is proposed now.
 4. Do `CONTRACT.md`, `RESEARCH.md` and `IDEAS.md` get front matter too, or decisions only?
+5. (Job 1) Does the revisit trigger suit you: an A/B with `codebase-memory-mcp` once a
+   codebase passes about 20,000 lines, or when sessions are seen re-reading files to trace
+   calls?
 
 ---
 
