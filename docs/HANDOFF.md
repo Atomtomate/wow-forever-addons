@@ -51,8 +51,8 @@ Discord is backlog, not part of the first release.
 What this changes in the list below: the tag `v0.1.0` is never pushed and the Go companion's
 "Verify on the PC" run is not done (D9, decision 4, the owner: "yes"); the first release is the
 Tauri app, and the "Verify on the PC" run is piece 1's sheet. Everything about the addon and the
-hub stands. Still open in D9: the licence file (deferred), WebView2 in the installer, macOS
-notarization, and the open points for the pieces.
+hub stands. Still open in D9: the licence file (deferred), macOS notarization, and the open points
+for the pieces.
 
 ## State on 2026-11-13, still current
 

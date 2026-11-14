@@ -235,8 +235,8 @@ addon may refer to the client's own textures by path without shipping them.
 coordinator session's or its research's. The owner answered 1 to 6 in the coordinator session on
 2026-11-14 ("1. I am fine and from what I can tell, the costs for private certificates are below
 $100, 2. yes, 3. ok, this is not a day0 item, tho, 4. yes, 5. let's see later, 6. user provides
-it"). The owner then changed answer 6 the same day (see 6). Each answer follows its item; 5 and 7
-stay open.
+it"). The owner then changed answer 6 the same day (see 6) and answered 7 with "OK". Each
+answer follows its item; only 5 stays open.
 
 1. **Signing, and the Windows trust prompts.** Unsigned, an installer shows a browser warning and
    a SmartScreen warning, and is blocked outright where Smart App Control is on. A certificate in
@@ -303,7 +303,7 @@ stay open.
    pastes the address once at setup, as in the Go companion; whether that stays as a fallback is
    for the link's piece to propose. The skeleton registers no URL scheme: it arrives with the
    link.
-7. **The Windows installer and WebView2** (still open). Tauri's NSIS installer has a
+7. **The Windows installer and WebView2.** Tauri's NSIS installer has a
    `webviewInstallMode` (Tauri's "Windows Installer" guide, read 2026-11-14 from
    `tauri-apps/tauri-docs`):
    `downloadBootstrapper`, the default, downloads Microsoft's WebView2 bootstrapper and runs it
@@ -318,6 +318,12 @@ stay open.
    it runs only when that component is missing, and an install that fails for a missing runtime
    is exactly the "shaky" experience the owner ruled out. Piece 1 may build with the default
    meanwhile, because nothing reaches members before the owner decides.
+   **Decided:** put to the owner as "I recommend allowing Microsoft's installer to be fetched
+   when the runtime is missing", the owner answered "OK" (2026-11-14). The Windows installer may
+   download and run Microsoft's WebView2 bootstrapper when the runtime is missing
+   (`downloadBootstrapper`). This is a named exception beside D7's "never ... run anything it
+   downloaded": it is the installer, not the app; it is Microsoft's signed installer for an
+   operating-system component; and it runs only when that component is missing.
 
 **Open points for the pieces**, not decisions yet:
 
