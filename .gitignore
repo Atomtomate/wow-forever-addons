@@ -2,3 +2,4 @@ data/
 .release/
 *.zip
 .luacheckcache
+companion-app/target/
