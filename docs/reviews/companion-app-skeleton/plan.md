@@ -1,3 +1,5 @@
+> Superseded where it mentions the deep link: the owner removed it from this piece on 2026-11-14 (D9, PR #5).
+
 # Plan: `companion-app/`, the Forever Friends tray app skeleton (Rust + Tauri 2)
 
 Base `main` at `d31312e`. Mode: large (a new party), no change to `docs/CONTRACT.md` formats.
