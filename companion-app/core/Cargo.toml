@@ -1,0 +1,9 @@
+[package]
+name = "forever-friends-core"
+description = "Forever Friends companion app: pure logic, std only, no GUI and no I/O"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
