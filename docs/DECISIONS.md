@@ -218,9 +218,8 @@ When talking about private, I mean the actual instance that is being hosted, whe
 lives." and "I like the semi-public route". So this repository and its releases are public, and
 the hosted hub instance and its data are private, invite-only. It follows that GitHub Releases
 is an acceptable download channel, and that neither the app nor this repository may contain the
-hub's address or any instance data: the member provides the address when a PC is linked
-(decision 6 below). A "Connect this PC" link that would open the app through a custom URL scheme
-is not pursued for now (`docs/IDEAS.md`), and the app registers no URL scheme.
+hub's address or any instance data: it reaches the app through a "Connect this PC" link on the
+hub page (decision 6 below).
 
 **Assets.** The owner: "we need to take care of the non-free assets we are using. Those are still
 possible for our private instance, but need to be replaced with license free ones for the
@@ -236,7 +235,8 @@ addon may refer to the client's own textures by path without shipping them.
 coordinator session's or its research's. The owner answered 1 to 6 in the coordinator session on
 2026-11-14 ("1. I am fine and from what I can tell, the costs for private certificates are below
 $100, 2. yes, 3. ok, this is not a day0 item, tho, 4. yes, 5. let's see later, 6. user provides
-it"); each answer follows its item. 5 and 7 stay open.
+it"). The owner then changed answer 6 the same day (see 6). Each answer follows its item; 5 and 7
+stay open.
 
 1. **Signing, and the Windows trust prompts.** Unsigned, an installer shows a browser warning and
    a SmartScreen warning, and is blocked outright where Smart App Control is on. A certificate in
@@ -284,12 +284,28 @@ it"); each answer follows its item. 5 and 7 stay open.
    **Deferred:** the owner: "let's see later". Stays open.
 6. **How the hub's address reaches the app.** The "Connect this PC" link (a custom URL scheme
    carrying the address and a one-time code, confirmed in the app) was the idea on the table; it
-   would change `docs/CONTRACT.md` §3 and need the hub's side. **Decided:** the owner: "user
-   provides it". The member types or pastes the hub's address once at setup, as in the Go
-   companion. The link is not planned; it stays an idea in `docs/IDEAS.md`, and the app
-   registers no URL scheme.
+   changes `docs/CONTRACT.md` §3 and needs the hub's side. The owner first answered "user
+   provides it". Asked to hear the case for the link again, the coordinator gave its advantages
+   (no typing or copying; a mistyped address is the likeliest first-run failure for a
+   non-technical friend; address and approval travel in one step; it behaves like other apps)
+   and its costs (work on the hub and the app and a contract change; a registered link type on
+   the PC; an inbound door that must show the hub it would connect to and ask first; it works
+   only once the app is installed), and recommended: "Typing the address once is fine for
+   getting the first working version to you, and the link is the right finish before friends are
+   onboarded ... build without it now, and add it as its own piece before the first release to
+   friends." The owner: "that is good. do it instead".
+   **Decided:** the link is how the hub's address reaches the app for the friends. A button on
+   the hub page, for a logged-in member, opens the installed app through a custom URL scheme
+   carrying the hub's address and a one-time code; the app shows which hub it is about to connect
+   to and asks before it acts; what the link carries is untrusted input. It is its own piece,
+   with the hub's side and the `docs/CONTRACT.md` §3 change first, and lands before the first
+   release that reaches friends. Until then the member (in practice the owner, testing) types or
+   pastes the address once at setup, as in the Go companion; whether that stays as a fallback is
+   for the link's piece to propose. The skeleton registers no URL scheme: it arrives with the
+   link.
 7. **The Windows installer and WebView2** (still open). Tauri's NSIS installer has a
-   `webviewInstallMode` (Tauri's "Windows Installer" guide, read 2026-11-14 from `tauri-apps/tauri-docs`):
+   `webviewInstallMode` (Tauri's "Windows Installer" guide, read 2026-11-14 from
+   `tauri-apps/tauri-docs`):
    `downloadBootstrapper`, the default, downloads Microsoft's WebView2 bootstrapper and runs it
    when the runtime is missing; `embedBootstrapper` ships the bootstrapper inside our installer
    (about 1.8 MB), which still fetches the runtime from Microsoft; `offlineInstaller` embeds the

@@ -46,11 +46,11 @@ The durable backlog; entries are updated, never deleted. Status words: **next**,
   Control does with a newly signed file. `docs/RESEARCH.md` §7.1.
 - **Companion app: macOS notarization** — parked on the owner's word. Apple's Developer ID costs
   USD 99 a year; without it a Mac friend goes through System Settings to open the app.
-- **"Connect this PC" link** — parked. A button on the hub page that would open the app through
-  a custom URL scheme with the hub's address and a one-time code, so setup needs no typing. The
-  owner chose instead that the member provides the address ("user provides it", D9, decision 6,
-  2026-11-14), so the app registers no URL scheme. Would need the hub's side
-  (`Atomtomate/wow-forever-hub`) and a change to `docs/CONTRACT.md` §3.
+- **"Connect this PC" link** — next, piece 8 of the plan in `docs/HANDOFF.md`, before the first
+  release that reaches friends (D9, decision 6: the owner, 2026-11-14, "that is good. do it
+  instead"). A button on the hub page opens the installed app through a custom URL scheme with the
+  hub's address and a one-time code; the app shows the hub and asks before it acts. Needs the
+  hub's side (`Atomtomate/wow-forever-hub`) and the `docs/CONTRACT.md` §3 change first.
 - **Companion app: a Discord item** — later, not in the first release (the owner, 2026-11-14: "not
   a day0 item"). Account linking and any bot belong on the hub; the app needs only a menu item
   that opens the hub's page for it. Waits for the hub to have one.

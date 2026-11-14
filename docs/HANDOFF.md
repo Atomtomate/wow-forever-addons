@@ -20,8 +20,8 @@ decided scope**: the owner can reorder or cut it.
    and the native feel. It adds the `make` targets a Rust change must pass and names them in its
    pull request; writing them into `CLAUDE.md` and `.claude/agents.local.md` falls to piece 2.
    It is a skeleton for the owner's PC, not a release to members, so it may install and
-   register autostart ahead of the §5 change that piece 4 or 5 makes. No URL scheme (D9,
-   decision 6: the member types the hub's address).
+   register autostart ahead of the §5 change that piece 4 or 5 makes. No URL scheme: it
+   arrives with piece 8 (D9, decision 6).
 2. **Core port A**: a Rust library crate with no Tauri dependency: the wire formats, request
    signing, the hub client, config, atomic file writes and the log, proven byte-for-byte against
    the Go program with golden files generated from it.
@@ -30,18 +30,23 @@ decided scope**: the owner can reorder or cut it.
 4. **First-run setup and linking** in the app's window; status in the tray. It or piece 5
    changes `docs/CONTRACT.md` §5 to name the installer folder, the autostart entry, the app's data
    folder and the web view's cache (proposed in the body of the piece 0 pull request), before
-   any release to members. The member types or pastes the hub's address here (D9, decision 6).
+   any release to members. Here the member types or pastes the hub's address; piece 8 adds the
+   link.
 5. **Windows release**: the installer, autostart, the release workflow rebuilt for builds per
    operating system, signed with the owner's certificate (D9, decision 1; the certificate
    authority is chosen before this piece); the Go companion, its workflow and `go.mod` removed
-   (D9, decision 4).
+   (D9, decision 4). It builds and signs the release; **the first release that reaches friends
+   waits for piece 8**.
 6. **macOS and Linux** (the `docs/IDEAS.md` entry that was next after version one).
 7. **Updates**: the owner said yes (D9, decision 2); a decision entry with the design and the
    `docs/CONTRACT.md` change come first, in this piece.
+8. **"Connect this PC" link**, with the hub's side and the `docs/CONTRACT.md` §3 change first
+   (D9, decision 6). The URL scheme, the confirmation in the app, and whether typing the address
+   stays as a fallback. **Order:** after piece 4 and before the first release to friends; it
+   is numbered 8 only so that references to the other pieces stay valid. It also adds the scheme
+   registration to `docs/CONTRACT.md` §5.
 
-The former piece 8, the "Connect this PC" link, is dropped: the member provides the hub's
-address (D9, decision 6); the link is parked in `docs/IDEAS.md`. Discord is backlog, not part of
-the first release.
+Discord is backlog, not part of the first release.
 
 What this changes in the list below: the tag `v0.1.0` is never pushed and the Go companion's
 "Verify on the PC" run is not done (D9, decision 4, the owner: "yes"); the first release is the
