@@ -41,12 +41,13 @@ breaking for the other two parties: say so.
   Go rules below apply by analogy (logic in a library crate with no Tauri dependency, tested
   without a PC; code for one operating system behind one small function).
 - Go (the companion, `companion/`): the reference implementation and test oracle until the
-  companion app reaches parity, then removed (D9). Standard library only, as written. `companion/` holds `package main` and stays
-  thin; logic lives in packages under `companion/internal/` that do not import each other in
-  a cycle and do not reach for the network, the clock or the file system except through what
-  the caller passes in, so they are tested without a PC. For writing files, a root directory
-  passed in counts as that (Go's `io/fs` is read-only), and a test runs in a temporary one. Code for one operating system sits in
-  `_windows.go` / `_other.go` files behind one small function each.
+  companion app reaches parity, then removed (D9). Standard library only, as written.
+  `companion/` holds `package main` and stays thin; logic lives in packages under
+  `companion/internal/` that do not import each other in a cycle and do not reach for the
+  network, the clock or the file system except through what the caller passes in, so they are
+  tested without a PC. For writing files, a root directory passed in counts as that (Go's
+  `io/fs` is read-only), and a test runs in a temporary one. Code for one operating system sits
+  in `_windows.go` / `_other.go` files behind one small function each.
 - There is no layering script. Read the imports.
 
 ## Where direction and the record live
@@ -83,8 +84,8 @@ The authority is `CLAUDE.md` ("Facts that do not move") and `docs/DECISIONS.md` 
 - SavedVariables is an addon's only output. Inside the game folder the companion reads one
   SavedVariables file per account and writes only inside the two ForeverFriends addon folders;
   outside it, it keeps its own config folder, program copy and autostart entry and nothing
-  else (D7, `docs/CONTRACT.md` §5; an installer and a URL scheme for the app wait for a §5
-  change, D9).
+  else (D7, `docs/CONTRACT.md` §5; the app's installer folder and URL scheme are
+  added to §5 before a release reaches members, D9).
 - Nothing non-free in this repository or a release, no hub address and no instance data (D9).
 - Only what `docs/CONTRACT.md` lists crosses the wire; its §5 says what never does.
 - Text typed on the hub reaches the game only under the escaping rule of `docs/CONTRACT.md`

@@ -45,8 +45,8 @@ style applies here too (lightweight, decisions written down, the owner merges).
   `spec/support/wow.lua`.
 - `make lint test` must pass before a commit (`.githooks/pre-commit`, same as CI), and
   `make golint gotest` as well when a Go file changed (the Rust targets for `companion-app/` are
-  to be added by piece 1 of the plan in `docs/HANDOFF.md`, D9). Lint fails on an unlisted global: list it
-  in `.luacheckrc` or make it local.
+  to be added by piece 1 of the plan in `docs/HANDOFF.md`, D9). Lint fails on an unlisted
+  global: list it in `.luacheckrc` or make it local.
 - What a test cannot prove is written into the addon's README as "Verify in client" and into
   `docs/HANDOFF.md`, with the exact `/dump` or `/run` line to try.
 - A pull request is a draft only while it is being worked on. Once CI is green and its reviews

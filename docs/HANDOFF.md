@@ -17,15 +17,18 @@ decided scope**: the owner can reorder or cut it.
    only on demand, an autostart toggle, single instance, the URL scheme, a folder picker, a
    notification, an original placeholder icon, a per-user Windows installer, CI on Windows,
    macOS and Linux, and a "Verify on the PC" sheet the owner runs to see the unsigned install
-   and the native feel. It adds the `make` targets a Rust change must pass, and names them in
-   `CLAUDE.md` and `.claude/agents.local.md`.
+   and the native feel. It adds the `make` targets a Rust change must pass and names them in its
+   pull request; writing them into `CLAUDE.md` and `.claude/agents.local.md` falls to piece 2.
+   It is a skeleton for the owner's PC, not a release to members, so it may register the
+   installer, autostart and URL scheme ahead of the §5 change that piece 4 or 5 makes.
 2. **Core port A**: a Rust library crate with no Tauri dependency: the wire formats, request
    signing, the hub client, config, atomic file writes and the log, proven byte-for-byte against
    the Go program with golden files generated from it.
 3. **Core port B**: reading SavedVariables, finding the game folder, the embedded addon and its
    installation, the member list file, the sync loop, telling that the game runs.
-4. **First-run setup and linking** in the app's window; status in the tray. Needs the
-   `docs/CONTRACT.md` §5 change proposed in the pull request for piece 0, if the owner agrees.
+4. **First-run setup and linking** in the app's window; status in the tray. It or piece 5
+   changes `docs/CONTRACT.md` §5 to name the installer folder, the autostart entry and the URL
+   scheme (proposed in the body of the piece 0 pull request), before any release to members.
 5. **Windows release**: the installer, autostart, the release workflow rebuilt for builds per
    operating system; the Go companion and its workflow retired (removal is open decision 4 of
    D9).

@@ -194,15 +194,18 @@ the window closes is checked on the owner's PC in piece 1.
 **What it replaces in D7.** These sentences no longer hold: that the companion "is written in
 **Go and shipped as one executable**", and "It uses the Go standard library only; a dependency
 is asked for first, like a Lua library" (the owner: "This may be an old rule from another
-project. We do not have this 'no dependency' rule here"); and the console setup D7's companion
-does. What stands: D7's five jobs (install the carried addon, upload characters, report that
-the game runs, write the member list, check that the hub is reachable) and its "what it never
-does" list, including "run anything it downloaded, or update itself", which stands until the
-owner decides open decision 2 below. D7's paragraph on releases stands until piece 5 of the plan
-(`docs/HANDOFF.md`) replaces it; its platform paragraph is carried by piece 6. D7's text is not
-edited (this file is append-only); read it with this entry, as D7 is read with D4. One fact in D7's
-release paragraph was too kind: an unsigned program does not warn "each member once" but at every
-new version, because reputation is per file hash (`docs/RESEARCH.md` §7.1).
+project. We do not have this 'no dependency' rule here"); and, with them, the console setup of
+the Go companion (`companion/README.md`). What stands: D7's five jobs (install the carried
+addon, upload characters, report that the game runs, write the member list, check that the hub
+is reachable) and its "what it never does" list, including "run anything it downloaded, or
+update itself", which stands until the owner decides open decision 2 below. D7's paragraph on
+releases stands until piece 5 of the plan (`docs/HANDOFF.md`) replaces it; its platform
+paragraph is carried by piece 6. D7's text is not edited (this file is append-only); read it
+with this entry, as D7 is read with D4. What the app keeps on a PC (an installer's folder, the
+autostart entry, the registered URL scheme) must be named in `docs/CONTRACT.md` §5 before a
+release reaches members (piece 4 or 5); what a "Connect this PC" link carries is §3. One fact in
+D7's release paragraph was too kind: an unsigned program does not warn "each member once" but at
+every new version, because reputation is per file hash (`docs/RESEARCH.md` §7.1).
 
 **The Go companion** in `companion/` (v0.1.0, never run on a real PC, never tagged) stays in the
 tree as the reference implementation and test oracle until the Rust app reaches parity. The
