@@ -1,0 +1,23 @@
+[package]
+name = "forever-friends"
+description = "Forever Friends desktop companion (tray app skeleton)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "forever-friends"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = "2.7.4"
+
+[dependencies]
+forever-friends-core = { path = "../core" }
+serde = { version = "1", features = ["derive"] }
+tauri = { version = "2.12.5", features = ["tray-icon"] }
+tauri-plugin-autostart = "2.7.0"
+tauri-plugin-dialog = "2.8.4"
+tauri-plugin-notification = "2.8.1"
+tauri-plugin-single-instance = "2.5.5"

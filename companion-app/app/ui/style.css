@@ -1,0 +1,74 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f4f6fb;
+  --card: #ffffff;
+  --text: #1d2433;
+  --muted: #5d6679;
+  --line: #d8deea;
+  --accent: #3b5bdb;
+  --accent-text: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1d2433;
+    --card: #262f43;
+    --text: #e8ecf5;
+    --muted: #a3adc2;
+    --line: #36415a;
+    --accent: #748ffc;
+    --accent-text: #11172a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; height: 100%; }
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--text);
+  /* Chrome is not selectable, like a native window; the path is (see .value). */
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+main { padding: 20px 24px; }
+
+h1 { margin: 0 0 4px; font-size: 20px; font-weight: 600; }
+h2 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
+.status { margin: 0 0 16px; color: var(--muted); }
+
+section {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.value {
+  margin: 0 0 10px;
+  word-break: break-all;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+button {
+  font: inherit;
+  color: var(--accent-text);
+  background: var(--accent);
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+footer { margin-top: 8px; font-size: 12px; color: var(--muted); }

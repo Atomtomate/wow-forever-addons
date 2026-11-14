@@ -1,0 +1,100 @@
+name: Companion app
+# The Rust + Tauri tray app in companion-app/. Separate from ci.yml so the Lua and Go checks do
+# not wait for it. Only first-party actions: checkout, cache, upload-artifact.
+on:
+  pull_request:
+    paths: ['companion-app/**', '.github/workflows/companion-app.yml']
+  push:
+    branches: [main]
+    paths: ['companion-app/**', '.github/workflows/companion-app.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: companion-app
+
+env:
+  TAURI_CLI_VERSION: 2.12.4
+  LINUX_GUI_PACKAGES: libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev build-essential file
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The runner image's own Rust (rustup, stable); this only makes sure the two tools are there.
+      - run: rustup component add clippy rustfmt
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            companion-app/target
+          key: cargo-check-${{ runner.os }}-${{ hashFiles('companion-app/Cargo.lock') }}
+          restore-keys: cargo-check-${{ runner.os }}-
+      # Before the GUI libraries are installed: the core crate must need nothing but Rust.
+      - name: Core crate alone
+        run: cargo test -p forever-friends-core --locked
+      - name: GUI libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y $LINUX_GUI_PACKAGES
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked
+
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows is built by the installer job below.
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            companion-app/target
+          key: cargo-build-${{ runner.os }}-${{ hashFiles('companion-app/Cargo.lock') }}
+          restore-keys: cargo-build-${{ runner.os }}-
+      - name: GUI libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y $LINUX_GUI_PACKAGES
+      # A plain build proves it compiles and links on each system; no CLI needed.
+      - run: cargo build --release --locked
+
+  # Builds the unsigned Windows installer and attaches it to the run (Summary, Artifacts). Runs on
+  # pull requests, whose runs read this file from the branch, and by hand once the file is on the
+  # default branch. No release, no tag.
+  installer:
+    if: github.event_name != 'push'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-tauri.exe
+            ~/.cargo/registry
+            ~/.cargo/git
+            companion-app/target
+          key: cargo-installer-${{ runner.os }}-cli${{ env.TAURI_CLI_VERSION }}-${{ hashFiles('companion-app/Cargo.lock') }}
+          restore-keys: cargo-installer-${{ runner.os }}-cli${{ env.TAURI_CLI_VERSION }}-
+      - name: Tauri CLI
+        shell: bash
+        run: cargo tauri --version 2>/dev/null | grep -q " $TAURI_CLI_VERSION$" || cargo install tauri-cli --version "$TAURI_CLI_VERSION" --locked --force
+      - run: cargo tauri build --bundles nsis
+        working-directory: companion-app/app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forever-friends-windows-installer
+          path: companion-app/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
