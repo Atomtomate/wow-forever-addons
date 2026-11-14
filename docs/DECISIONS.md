@@ -220,7 +220,11 @@ is an acceptable download channel, and that neither the app nor this repository 
 hub's address or any instance data: the address reaches the app when a PC is linked. (The idea
 on the table, not decided and needing the hub's side: a "Connect this PC" link on the hub page
 that opens the app through a custom URL scheme with the address and a one-time code, so setup
-needs no typing; `docs/IDEAS.md`.)
+needs no typing; `docs/IDEAS.md`.) Until that is decided, a `foreverfriends://` link carries no meaning:
+the skeleton of piece 1 registers the scheme, only displays what arrives through it and treats it
+as untrusted. Today the companion starts a link and the hub answers with the code the member
+approves (`docs/CONTRACT.md` §3.1, D8); which way a future one-time code travels is part of open
+decision 6.
 
 **Assets.** The owner: "we need to take care of the non-free assets we are using. Those are still
 possible for our private instance, but need to be replaced with license free ones for the
@@ -266,3 +270,29 @@ session's or its research's, not the owner's word.
    carrying the address and a one-time code, confirmed in the app) is the idea on the table; it
    changes `docs/CONTRACT.md` §3 and needs the hub's side (piece 8). Until then the member types
    or pastes the address once, as in the Go companion.
+7. **The Windows installer and WebView2.** Tauri's NSIS installer has a `webviewInstallMode`
+   (Tauri's "Windows Installer" guide, read 2026-11-14 from `tauri-apps/tauri-docs`):
+   `downloadBootstrapper`, the default, downloads Microsoft's WebView2 bootstrapper and runs it
+   when the runtime is missing; `embedBootstrapper` ships the bootstrapper inside our installer
+   (about 1.8 MB), which still fetches the runtime from Microsoft; `offlineInstaller` embeds the
+   whole runtime installer (about 127 MB, no internet needed); `fixedVersion` ships a runtime of
+   our own (about 180 MB); `skip` installs nothing, and the app "WILL NOT work" where the
+   runtime is missing, though WebView2 is part of Windows 10 (from 2018) and 11. The first two
+   mean the installer runs something it downloaded, which D7's "never ... run anything it
+   downloaded" was not written for. *Recommendation (the coordinator):* allow the bootstrapper as
+   a named exception: it is Microsoft's own signed installer for an operating-system component,
+   it runs only when that component is missing, and an install that fails for a missing runtime
+   is exactly the "shaky" experience the owner ruled out. Piece 1 may build with the default
+   meanwhile, because nothing reaches members before the owner decides.
+
+**Open points for the pieces**, not decisions yet:
+
+- Whether "Start with Windows" may be switched on before the PC is linked. `docs/CONTRACT.md`
+  §3.1 step 4 says today that the companion registers its autostart only once `linked` is true;
+  a different order changes that line first.
+- The app's version number and the addon's: the Go companion and the addon share one number
+  because the executable carries the addon (`README.md`, "Releasing the companion"); whether the
+  app keeps that rule is for piece 5.
+- The application identifier piece 1 chose, `io.github.atomtomate.foreverfriends`, names the
+  app's data folder and its registration with the system and is expensive to change after a
+  release: the owner confirms it before the first one.
