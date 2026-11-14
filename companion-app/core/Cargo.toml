@@ -1,6 +1,6 @@
 [package]
 name = "forever-friends-core"
-description = "Forever Friends companion app: pure logic, std only, no GUI and no I/O"
+description = "Forever Friends companion app: logic with no Tauri or GUI dependency; network, clock and file system only through what the caller passes in"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

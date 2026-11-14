@@ -1,5 +1,7 @@
 //! First start: say once, with one notification, that the app lives in the tray. A marker file in
-//! the app's own data folder remembers it. Failures are logged and never stop the app.
+//! the app's own data folder remembers it. Failures are logged and never stop the app, except
+//! that on Windows and macOS the notification plugin reports no failure at all: a refused toast
+//! is silent there (the Verify sheet checks what the member actually sees).
 
 use tauri::{AppHandle, Manager};
 use tauri_plugin_notification::NotificationExt;
@@ -22,7 +24,7 @@ pub fn run(app: &AppHandle) {
         .body("Forever Friends is in your tray.")
         .show();
     if let Err(error) = shown {
-        crate::debug_log(&format!("could not show the first-start notice: {error}"));
+        crate::debug_log(&format!("first-start notice refused: {error}"));
     }
     // Written even if the notice failed: better to stay quiet than to repeat it every start.
     if let Err(error) = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&marker, b"")) {

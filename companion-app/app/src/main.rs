@@ -29,7 +29,8 @@ fn main() {
             window::open_main(app)
         }))
         // Never enabled at start; the tray toggle is the member's choice. macOS defaults to a
-        // launch agent.
+        // launch agent. The name must equal `productName` in tauri.conf.json: the NSIS
+        // uninstaller removes the Run entry by that name.
         .plugin(
             tauri_plugin_autostart::Builder::new()
                 .app_name("Forever Friends")

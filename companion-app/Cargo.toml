@@ -7,10 +7,3 @@ version = "0.0.1"
 edition = "2024"
 rust-version = "1.90"
 publish = false
-
-[profile.release]
-codegen-units = 1
-lto = true
-opt-level = "s"
-panic = "abort"
-strip = true

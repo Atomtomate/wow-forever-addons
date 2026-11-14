@@ -1,8 +1,8 @@
-//! Pure logic for the Forever Friends companion app.
+//! Logic for the Forever Friends companion app that needs no window.
 //!
-//! No dependencies, no I/O, no GUI: everything here is tested with `cargo test -p
-//! forever-friends-core` on a machine that has only a Rust toolchain. Logic that does not need
-//! the GUI goes here, not in the app crate.
+//! No Tauri or GUI dependency, so `cargo test -p forever-friends-core` runs on a machine that has
+//! only a Rust toolchain. It reaches the network, the clock and the file system only through what
+//! the caller passes in (a root path, a closure or trait the app crate implements).
 
 /// The app's version, from the workspace's `Cargo.toml`.
 pub fn version() -> &'static str {

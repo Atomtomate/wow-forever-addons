@@ -1,6 +1,6 @@
 "use strict";
 
-// The page asks Rust for its state and listens for changes. Anything that came from outside
+// The page asks Rust for its state and shows what comes back. Anything that came from outside
 // (the folder path) is written with textContent only, never as markup.
 (function () {
   var tauri = window.__TAURI__;
@@ -15,10 +15,14 @@
   document.addEventListener("contextmenu", function (event) { event.preventDefault(); });
 
   el("pick").addEventListener("click", function () {
-    // The result arrives through the "ui-state" event too; the catch is for a refused call.
-    tauri.core.invoke("pick_game_folder").catch(function () {});
+    var button = el("pick");
+    // One dialog at a time: a double-click must not open two. A cancelled pick returns null.
+    button.disabled = true;
+    tauri.core.invoke("pick_game_folder")
+      .then(function (state) { if (state) { render(state); } })
+      .catch(function () {})
+      .finally(function () { button.disabled = false; });
   });
 
-  tauri.event.listen("ui-state", function (event) { render(event.payload); });
   tauri.core.invoke("get_ui_state").then(render).catch(function () {});
 })();
