@@ -18,8 +18,25 @@ How each claim was checked:
 
 | Job | Recommendation | Decision needed from the owner |
 |-----|----------------|--------------------------------|
-| 1. Code graph | **Adopt nothing yet.** Revisit when the Rust app or the hub grows, using a three-question A/B with `codebase-memory-mcp`, the best of the tools tried. | None now. Say whether the revisit trigger below suits you. |
-| 2. Knowledge base | **Keep git Markdown as the source of truth; split decisions into one file each with typed front-matter links, and view them in Obsidian.** Basic Memory is the later option for agents. | Whether to split `docs/DECISIONS.md`, and how you want to read it on a phone (see the end). |
+| 1. Code graph | **Adopt nothing yet.** Revisit when the Rust app or the hub grows, using a three-question A/B with `codebase-memory-mcp`, the best of the tools tried. | **Answered: accepted** (below). |
+| 2. Knowledge base | **Keep git Markdown as the source of truth; split decisions into one file each with typed front-matter links, and view them in Obsidian.** Basic Memory is the later option for agents. | **Answered: accepted as the start, not the end state** (below). Still open: reading on a phone, and front matter beyond decisions. |
+
+### The owner's answers (2026-11-14)
+
+The owner answered in the coordinator session (`session_01BoZz39J5gTi1eky3ESzWYZ`), and that
+session relayed both answers here.
+
+1. **Code graph.** Asked "Is skipping the code graph for now acceptable, given that you asked
+   for one?", the owner answered: **"yes"**. Nothing is adopted now, and the revisit trigger in
+   job 1 stands. This answer is as relayed; the transcript page read here did not reach it.
+2. **Knowledge base.** Asked "is Markdown in git with one file per decision, viewed in
+   Obsidian, the one you want?", the owner answered: **"For a start maybe, I want a more
+   systematic solution that interacts optimally with LLMs i[n] the future"**. This one was
+   checked word for word in that session's transcript. So the first choice is the starting
+   point, not the end state. [Where this is meant to go](#where-this-is-meant-to-go) says what
+   the end state needs and what to keep true now. The split of `docs/DECISIONS.md` is its own
+   small piece, after pull request #5 (which edits that file) has merged; it follows
+   [the schema below](#the-schema-the-split-follows).
 
 ---
 
@@ -203,11 +220,17 @@ where Basic Memory's search and context tools would pay off first, so pilot opti
 at all. The fleet repository `Atomtomate/agents` is consumed as a submodule, so files with front
 matter suit it, and a server-based knowledge base would not.
 
-### Sketch: this project's decisions in the first choice
+### The schema the split follows
+
+This is what the piece that splits `docs/DECISIONS.md` should build, after pull request #5 has
+merged. It is fixed here so that every later tool reads the same thing.
+
+**Layout**
 
 ```
 docs/decisions/
-  INDEX.md                      # generated: id, title, status, one line, links
+  README.md                     # this schema, short; how to add a decision
+  INDEX.md                      # generated, never edited by hand
   D1-one-repository.md
   D2-retail-lineage-client.md
   D3-three-testing-tiers.md
@@ -216,44 +239,129 @@ docs/decisions/
   D6-foreverfriends-first.md
   D7-companion-program.md
   D8-what-crosses-the-wire.md
-  D9-....md                     # arriving from the companion-app session
+  D9-<slug>.md                  # whatever pull request #5 records as D9
 ```
+
+- The file name is `D<n>-<slug>.md`. `<n>` is the decision's number for good: it is never
+  reused or renumbered. `<slug>` is lowercase ASCII words joined by hyphens, chosen once and
+  never renamed, so links and URLs stay stable.
+- A new decision takes the next free number. A decision changes only through a new decision
+  that supersedes it, in whole or in part. The record stays append-only, as it is today.
+- `docs/DECISIONS.md` becomes a one-paragraph pointer to `docs/decisions/`. Links elsewhere
+  that read "D7" keep working, because the identifier does not change.
+
+**Front matter: a closed set of keys**
 
 ```yaml
-# D7-companion-program.md
 ---
-id: D7
-title: A companion program on each member's PC carries the data
-date: 2026-11-13
-status: accepted          # accepted | superseded | partly-superseded
-supersedes: []            # whole decisions this one replaces
-supersedes_part: [D4]     # stated in D7: "D4's 'no desktop daemon' no longer holds"
-superseded_by: []         # filled when a later decision replaces this one
-superseded_by_part: []
-depends_on: [D6]          # inferred: the companion carries the ForeverFriends addon; D7 does not say it
-relates_to: [docs/CONTRACT.md#5, companion/]
-prs: [4]
-open_questions: []
+id: D7                      # required; equals the file name's D<n>
+title: A companion program on each member's PC carries the data   # required; the heading text
+date: 2026-11-13            # required; the day it was decided, YYYY-MM-DD
+status: accepted            # required; one of: proposed | accepted | partly-superseded | superseded | withdrawn
+supersedes: []              # decision ids this one replaces whole
+supersedes_part: [D4]       # decision ids this one replaces in part; the body says which part
+superseded_by: []           # mirror of supersedes, set on the older decision
+superseded_by_part: []      # mirror of supersedes_part
+depends_on: [D6]            # decision ids this one assumes
+relates_to: []              # decision ids related without dependence
+code: [companion/]          # repository paths (files or directories) this decision governs
+docs: [docs/CONTRACT.md#5]  # document paths, with an optional #anchor
+prs: [4]                    # pull request numbers in this repository
+open_questions: []          # one string each, short
 ---
 ```
 
-D4 would carry `superseded_by_part: [D7]`. Only that edge is stated in the text today. The
-others (D7 on D6, D8 on D7, client-facing entries on D2 and D5) are inferences, and the session
-that does the split would propose them for review. If the companion-app session's D9 replaces
-the Go companion, D9 gets `supersedes_part: [D7]` and D7 `superseded_by_part: [D9]`.
+- The body is the decision's existing text, moved unchanged, under `# D7 — <title>`. The
+  supersession sentences stay in the body as prose, and the front matter carries the edge.
+- After the body comes a `## Relations` block, generated from the front matter by the same
+  script that writes `INDEX.md`. It has one line per edge, such as `- supersedes_part [[D4]]`
+  and `- depends_on [[D6]]`, and is never edited by hand. That line format is what Basic Memory
+  reads as typed relations [read], so moving to it later needs no rewrite.
+
+**Edges of D1–D8 as far as their text states them today:** D7 `supersedes_part: [D4]`, and so
+D4 `superseded_by_part: [D7]` with `status: partly-superseded`. Every other edge (D7 on D6, D8
+on D7, client-facing entries on D2 and D5) is an inference. The split proposes those for review
+in its pull request and does not slip them in as fact.
+
+**The check** (in `make lint`, so the pre-commit hook and CI run it). It is a small script with
+no dependency beyond the toolchain the repository already has.
+
+- Every file in `docs/decisions/` other than `README.md` and `INDEX.md` has front matter with
+  exactly the required keys, and only keys from the list above.
+- `id` matches the file name; ids are unique; `date` is a valid date; `status` is from the list.
+- Every decision id in a link key names an existing file, and no decision links to itself.
+- The mirrors agree: A has `supersedes: [B]` exactly when B has `superseded_by: [A]`, and the
+  same for `_part`.
+- Status agrees with the edges: `superseded` exactly when `superseded_by` is non-empty;
+  `partly-superseded` exactly when only `superseded_by_part` is non-empty.
+- Every `code` and `docs` path exists, without the anchor. Every `prs` entry is a positive
+  integer; whether the pull request exists is not checked offline.
+- `INDEX.md` and every `## Relations` block equal what the generator writes now.
+
+### Where this is meant to go
+
+The owner wants "a more systematic solution that interacts optimally with LLMs". Per-decision
+files are the start. From the research above, the end state has to provide five things that
+files alone do not.
+
+1. **Retrieval of a neighbourhood.** "Give me D7 and everything one or two links away", in one
+   call, without reading the folder.
+2. **Typed links that agents query and write**, through a tool interface (MCP), not by
+   editing YAML by hand.
+3. **Validation.** Links resolve, mirrors agree and statuses match the edges, whoever wrote
+   the change: a session, the owner in Obsidian, or a tool.
+4. **Search across the record** by meaning as well as by word, once it is too big to skim.
+5. **One base across the owner's projects** (this one, `boardgame-tracker`, the fleet), so a
+   decision in one can be found from another. Each project's record still lives in its own
+   repository.
+
+**The natural next step on the same files: Basic Memory.** It is an MCP server over a folder of
+Markdown that keeps a rebuildable local SQLite index. It reads `## Relations` lines as typed
+edges, and its context tool follows them to return a neighbourhood. That covers points 1, 2 and
+part of 4. [read: its repository] The files stay the source of truth and pull requests stay
+the review gate, because what it writes lands in the same files, which are committed like any
+edit.
+
+- **Point 3 stays with the check above.** Basic Memory does not enforce this schema; the CI
+  check does, for every writer.
+- **Point 5:** whether one Basic Memory instance can serve several repositories' folders at
+  once was **not checked**. That is the first thing to find out when the move is considered.
+- **What it costs:** it is AGPL, comes from PyPI, and needs a `uvx`/`pip` install in each cloud
+  container. Per `CLAUDE.md` it is a new dependency and needs the owner's yes.
+
+Beyond Basic Memory, nothing found in this research justifies a graph database or an
+LLM-extracted memory graph (Graphiti, Cognee) for a record this size. Each needs a server, an
+LLM key and its own review process.
+
+**What should trigger the move**, any one of these:
+
+- the decision folder passes about 50 files;
+- sessions are seen reading the whole folder, or `INDEX.md` plus many files, to answer one
+  question about a decision;
+- the owner wants to ask a question across projects ("have we decided this before elsewhere?");
+- agents start writing decisions often enough that YAML edits by hand become a source of
+  errors the check keeps catching.
+
+**What to keep true now, so the move stays cheap:**
+
+- Identifiers are stable: `D<n>` and the slug never change.
+- The front-matter schema is fixed. A new key is added here, in this file's successor, and in
+  the check, all in the same pull request.
+- Link types come from the closed list above; no ad-hoc relation names.
+- The `## Relations` block is generated in Basic Memory's line format.
+- The CI check runs on every change, so the files are always valid input for whatever tool
+  comes next.
 
 ### Decisions for the owner
 
-1. Split `docs/DECISIONS.md` into one file per decision: yes or no. If yes, should the session
-   that does it also add the link lint and the generated index?
+1. ~~Split `docs/DECISIONS.md` into one file per decision.~~ Answered: yes, as the start.
+   The split comes with the check and the index, as the schema above says.
 2. On a phone: GitHub mobile (read-only), Obsidian with Obsidian Sync (paid), or Obsidian with
    Syncthing.
 3. Trying Basic Memory later is a new dependency (AGPL, from PyPI). Per `CLAUDE.md` it waits
    for your yes; nothing is proposed now.
 4. Do `CONTRACT.md`, `RESEARCH.md` and `IDEAS.md` get front matter too, or decisions only?
-5. (Job 1) Does the revisit trigger suit you: an A/B with `codebase-memory-mcp` once a
-   codebase passes about 20,000 lines, or when sessions are seen re-reading files to trace
-   calls?
+5. ~~(Job 1) The revisit trigger.~~ Answered: adopt nothing now; the trigger stands.
 
 ---
 
