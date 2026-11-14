@@ -1,8 +1,60 @@
-# Handoff — 2026-11-13, second session (closing)
+# Handoff — 2026-11-14 (the companion app record), over 2026-11-13's second session
 
 Read this after `CLAUDE.md`. Replace it when the next session closes.
 
-## State
+## The companion app: the plan of pieces (2026-11-14)
+
+The owner decided that the companion becomes a desktop app in Rust and Tauri 2, tray-first,
+with the Go program in `companion/` kept as the reference implementation until the app reaches
+parity (`docs/DECISIONS.md` D9, which also lists the decisions still open). The research is
+`docs/RESEARCH.md`, "Companion app: choosing the technology". The coordinator session cut the
+work into the pieces below, one session and one pull request each. **This is the plan, not
+decided scope**: the owner can reorder or cut it.
+
+0. **This record** (D9, the research, the backlog, this plan). Documentation only.
+1. **App skeleton** in `companion-app/`, run in parallel with piece 0; touches only
+   `companion-app/`, the `Makefile` and `.github/workflows/`. Tauri 2, tray-first, a window
+   only on demand, an autostart toggle, single instance, a folder picker, a
+   notification, an original placeholder icon, a per-user Windows installer, CI on Windows,
+   macOS and Linux, and a "Verify on the PC" sheet the owner runs to see the unsigned install
+   and the native feel. It adds the `make` targets a Rust change must pass and names them in its
+   pull request; writing them into `CLAUDE.md` and `.claude/agents.local.md` falls to piece 2.
+   It is a skeleton for the owner's PC, not a release to members, so it may install and
+   register autostart ahead of the §5 change that piece 4 or 5 makes. No URL scheme: it
+   arrives with piece 8 (D9, decision 6).
+2. **Core port A**: a Rust library crate with no Tauri dependency: the wire formats, request
+   signing, the hub client, config, atomic file writes and the log, proven byte-for-byte against
+   the Go program with golden files generated from it.
+3. **Core port B**: reading SavedVariables, finding the game folder, the embedded addon and its
+   installation, the member list file, the sync loop, telling that the game runs.
+4. **First-run setup and linking** in the app's window; status in the tray. It or piece 5
+   changes `docs/CONTRACT.md` §5 to name the installer folder, the autostart entry, the app's data
+   folder and the web view's cache (proposed in the body of the piece 0 pull request), before
+   any release to members. Here the member types or pastes the hub's address; piece 8 adds the
+   link.
+5. **Windows release**: the installer, autostart, the release workflow rebuilt for builds per
+   operating system, signed with the owner's certificate (D9, decision 1; the certificate
+   authority is chosen before this piece); the Go companion, its workflow and `go.mod` removed
+   (D9, decision 4). It builds and signs the release; **the first release that reaches friends
+   waits for piece 8**.
+6. **macOS and Linux** (the `docs/IDEAS.md` entry that was next after version one).
+7. **Updates**: the owner said yes (D9, decision 2); a decision entry with the design and the
+   `docs/CONTRACT.md` change come first, in this piece.
+8. **"Connect this PC" link**, with the hub's side and the `docs/CONTRACT.md` §3 change first
+   (D9, decision 6). The URL scheme, the confirmation in the app, and whether typing the address
+   stays as a fallback. **Order:** after piece 4 and before the first release to friends; it
+   is numbered 8 only so that references to the other pieces stay valid. It also adds the scheme
+   registration to `docs/CONTRACT.md` §5.
+
+Discord is backlog, not part of the first release.
+
+What this changes in the list below: the tag `v0.1.0` is never pushed and the Go companion's
+"Verify on the PC" run is not done (D9, decision 4, the owner: "yes"); the first release is the
+Tauri app, and the "Verify on the PC" run is piece 1's sheet. Everything about the addon and the
+hub stands. Still open in D9: the licence file (deferred), macOS notarization, and the open points
+for the pieces.
+
+## State on 2026-11-13, still current
 
 - **The order changed.** PR #1 (MarketScan) is merged on the owner's word; it has not run in the
   game. The owner then made the first addon the group installs **ForeverFriends**, the link
@@ -32,7 +84,10 @@ Read this after `CLAUDE.md`. Replace it when the next session closes.
   exactly what to check: "Verify in client" in `addons/ForeverFriends/README.md` (8 items) and
   "Verify on the PC" in `companion/README.md` (15 items).
 
-## What has to happen before anyone can use it
+### What has to happen before anyone can use it
+
+Since D9 (2026-11-14), item 2 is dropped: v0.1.0 is never tagged, and members get the Tauri app
+(decision 4). Item 1 stands for whatever companion links first.
 
 1. The hub on the server is updated to `main` by the owner's ops session, so that a companion
    has something to link to. `PUBLIC_URL` must be `https://` and `TRUST_PROXY=1` behind Caddy.
@@ -41,7 +96,11 @@ Read this after `CLAUDE.md`. Replace it when the next session closes.
    `addons/ForeverFriends/ForeverFriends.toc`). The release workflow, which has never run,
    builds the files the hub's `/companion` page links to.
 
-## First steps for the next session
+### First steps for the next session
+
+These were written before D9. The tag and the Go companion's "Verify on the PC" run in steps 1
+and 2 are replaced by the plan at the top; the addon's "Verify in client" list, steps 3 to 5 and
+the hub update still stand.
 
 1. Ask the owner whether the ops session has updated the hub and whether the tag `v0.1.0` is
    pushed; look at the release workflow's first run.
@@ -58,7 +117,7 @@ Read this after `CLAUDE.md`. Replace it when the next session closes.
    but never show as in game) and **the addon list per member**.
 5. MarketScan's own "Verify in client" list is still open.
 
-## Decided by the owner this session
+### Decided by the owner on 2026-11-13
 
 In D6 to D8 with their words: ForeverFriends first; a companion per member, written in Go, one
 executable that carries and installs the addon and checks that the hub is reachable; the addon
@@ -66,7 +125,7 @@ list right after version one; a PC is linked by browser approval and signs every
 pasted token); the hub keeps the game's time of a character's last read and never shows it; the
 group has Mac and Linux players.
 
-## How this session ran, for the next one
+### How the 2026-11-13 session ran, for the next one
 
 - **Two corrections from the owner at the close; both are rules in `CLAUDE.md` now.** The
   finished pull requests had all been left as drafts, so nothing told the owner what to review.

@@ -30,10 +30,39 @@ The durable backlog; entries are updated, never deleted. Status words: **next**,
   in game: the program does not look for the game on macOS, and on Linux a game under Wine or
   Proton runs as the loader, not as a file in the game folder (matching the process's command
   line is the likely way; nobody has tried it). Needs someone with a Mac and someone on Linux
-  to run the checks. Which comes first, this or the addon list, is the owner's to say.
-- **Companion: update itself, a tray icon** — later. Self-update runs downloaded code on
-  friends' PCs and wants a signing story first (D7 rules it out for now). A tray icon waits
-  for someone who misses it.
+  to run the checks. Which comes first, this or the addon list, is the owner's to say. Since D9
+  (2026-11-14) this is done in the companion app, not the Go program: piece 6 of the plan in
+  `docs/HANDOFF.md`.
+- **Companion: a tray icon** — taken into D9 (2026-11-14): the companion app is tray-first, built
+  in piece 1 of the plan in `docs/HANDOFF.md`.
+- **Companion app: updates itself** — later, piece 7. The owner said yes on 2026-11-14 (D9,
+  decision 2), so D7's "never updates itself" is to change. Before any code: a decision entry
+  with the design (the research recommends updates verified against a key built into the app,
+  the private key signing in CI or offline, never on the hub) and where the files come from (the
+  public releases or the hub), and the change to `docs/CONTRACT.md`.
+- **Companion app: signing for Windows** — next, before piece 5. The owner accepts a certificate
+  in their own name as a private person (D9, decision 1, 2026-11-14). To settle: which
+  certificate authority, whether its signing works from GitHub Actions, and what Smart App
+  Control does with a newly signed file. `docs/RESEARCH.md` §7.1.
+- **Companion app: macOS notarization** — parked on the owner's word. Apple's Developer ID costs
+  USD 99 a year; without it a Mac friend goes through System Settings to open the app.
+- **"Connect this PC" link** — next, piece 8 of the plan in `docs/HANDOFF.md`, before the first
+  release that reaches friends (D9, decision 6: the owner, 2026-11-14, "that is good. do it
+  instead"). A button on the hub page opens the installed app through a custom URL scheme with the
+  hub's address and a one-time code; the app shows the hub and asks before it acts. Needs the
+  hub's side (`Atomtomate/wow-forever-hub`) and the `docs/CONTRACT.md` §3 change first.
+- **Companion app: a Discord item** — later, not in the first release (the owner, 2026-11-14: "not
+  a day0 item"). Account linking and any bot belong on the hub; the app needs only a menu item
+  that opens the hub's page for it. Waits for the hub to have one.
+- **Companion app: Discord Rich Presence** — later, not in the first release. The only Discord
+  feature that would live in the app itself; it would show what the member is doing to their
+  Discord friends, so it needs the owner's look at D8's "what crosses" first.
+- **Companion app: hub pages inside the app** — later. Showing a hub page in the app's window
+  instead of the browser. Waits for the app's window to exist (piece 4) and for someone who
+  misses it.
+- **Hub skin package** — deferred by the owner ("Not really necessary"). Blizzard's art stays on
+  the private hub and never enters this repository or a release (D9); a skin package installed
+  through a hub feature belongs to `Atomtomate/wow-forever-hub`'s backlog, not here.
 - **Companion: two members on one PC** — later. One companion links one member (D8); a mapping
   from WoW account to member would lift that. Unparks when a couple asks.
 - **Companion installs MarketScan too** — later, once MarketScan has run in the client.

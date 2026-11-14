@@ -1,5 +1,8 @@
 # The Forever Friends companion
 
+> 2026-11-14: this Go program is now the reference implementation and test oracle; the companion
+> members install will be the Rust and Tauri app in `companion-app/` (`docs/DECISIONS.md` D9).
+
 One program per member's PC, written in Go with the standard library only (`docs/DECISIONS.md` D7).
 The wire formats it speaks are `docs/CONTRACT.md`; this file is about running it.
 

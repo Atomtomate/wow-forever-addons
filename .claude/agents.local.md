@@ -16,7 +16,7 @@ repository stays lightweight (`CLAUDE.md`).
 | Agent | Owns | Never touches |
 |-------|------|---------------|
 | `impl-frontend` | `addons/` (each addon, its README and its `spec/`), `spec/support/wow.lua`, `.luacheckrc`, `.busted` | `companion/`, `go.mod`, `embed.go` |
-| `impl-backend` | `companion/`, `go.mod`, `embed.go`, `tools/`, `Makefile`, `.github/`, `.githooks/` | Lua under `addons/` and `spec/` |
+| `impl-backend` | `companion/`, `go.mod`, `embed.go`, `companion-app/` (D9), `tools/`, `Makefile`, `.github/`, `.githooks/` | Lua under `addons/` and `spec/` |
 | `impl-database` | nothing: this repository has no schema | |
 
 "Frontend" here is what runs inside the game; "backend" is what runs beside it. The one file
@@ -36,12 +36,18 @@ breaking for the other two parties: say so.
 
 - Lua: `CLAUDE.md`, "Working agreement" and "Conventions". Pure logic sits in files without
   client globals; client-facing code is thin; one addon never loads another's Lua.
-- Go (the companion): standard library only (D7). `companion/` holds `package main` and stays
-  thin; logic lives in packages under `companion/internal/` that do not import each other in
-  a cycle and do not reach for the network, the clock or the file system except through what
-  the caller passes in, so they are tested without a PC. For writing files, a root directory
-  passed in counts as that (Go's `io/fs` is read-only), and a test runs in a temporary one. Code for one operating system sits in
-  `_windows.go` / `_other.go` files behind one small function each.
+- Rust (the companion app, `companion-app/`, D9): Tauri 2, tray-first. The rules the reviewer
+  holds it to are written by piece 1 and piece 2 of the plan in `docs/HANDOFF.md`; until then the
+  Go rules below apply by analogy (logic in a library crate with no Tauri dependency, tested
+  without a PC; code for one operating system behind one small function).
+- Go (the companion, `companion/`): the reference implementation and test oracle until the
+  companion app reaches parity, then removed (D9). Standard library only, as written.
+  `companion/` holds `package main` and stays thin; logic lives in packages under
+  `companion/internal/` that do not import each other in a cycle and do not reach for the
+  network, the clock or the file system except through what the caller passes in, so they are
+  tested without a PC. For writing files, a root directory passed in counts as that (Go's
+  `io/fs` is read-only), and a test runs in a temporary one. Code for one operating system sits
+  in `_windows.go` / `_other.go` files behind one small function each.
 - There is no layering script. Read the imports.
 
 ## Where direction and the record live
@@ -78,7 +84,9 @@ The authority is `CLAUDE.md` ("Facts that do not move") and `docs/DECISIONS.md` 
 - SavedVariables is an addon's only output. Inside the game folder the companion reads one
   SavedVariables file per account and writes only inside the two ForeverFriends addon folders;
   outside it, it keeps its own config folder, program copy and autostart entry and nothing
-  else (D7, `docs/CONTRACT.md` §5).
+  else (D7, `docs/CONTRACT.md` §5; the app's installer folder and data folder are
+  added to §5 before a release reaches members, D9).
+- Nothing non-free in this repository or a release, no hub address and no instance data (D9).
 - Only what `docs/CONTRACT.md` lists crosses the wire; its §5 says what never does.
 - Text typed on the hub reaches the game only under the escaping rule of `docs/CONTRACT.md`
   §2, and the addon treats that data as untrusted.
@@ -89,6 +97,7 @@ The authority is `CLAUDE.md` ("Facts that do not move") and `docs/DECISIONS.md` 
 ## Toolchain
 
 - Lua: `make lint test` (luacheck and busted, the same as CI and the pre-commit hook).
+- Rust (`companion-app/`): the `make` targets are to be added by piece 1 (D9).
 - Go: `go vet ./... && go test ./...` from the repository root, and
   `GOOS=windows GOARCH=amd64 go build ./companion` to prove the Windows build compiles.
 - CI is `.github/workflows/ci.yml`. There is no running stack for `ops` and no rig for `qa`:
